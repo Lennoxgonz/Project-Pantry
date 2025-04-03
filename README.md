@@ -1,4 +1,4 @@
-#Project Pantry
+# Project Pantry
 A DIY project management app where you can create and keep track of your DIY projects.
 
 <a href="https://project-pantry-e2d5a.firebaseapp.com/" target="_blank">
