@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap-icons/font/bootstrap-icons.css";
 import PrivateRoute from "./components/PrivateRoute";
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
