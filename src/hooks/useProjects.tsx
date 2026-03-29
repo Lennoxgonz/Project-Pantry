@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Project, CreateProject } from "../types";
+import { Project } from "../types";
 import {
   SaveNewProjectPayload,
   SaveProjectRpcResult,
@@ -11,10 +11,8 @@ interface UseProjectsReturn {
   projects: Project[] | null;
   error: string | null;
   loading: boolean;
-  getProjects: () => Promise<void>;
-  getProjectById: (id: string) => Promise<Project | null>;
-  createProject: (project: CreateProject) => Promise<string | null>;
-  updateProject: (project: Partial<Project> & { id: string }) => Promise<void>;
+  fetchProjects: () => Promise<void>;
+  fetchProjectById: (id: string) => Promise<Project | null>;
   createProjectWithDetails: (
     userId: string,
     payload: SaveNewProjectPayload
@@ -31,7 +29,7 @@ export function useProjects(): UseProjectsReturn {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const getProjects = useCallback(async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -49,7 +47,7 @@ export function useProjects(): UseProjectsReturn {
     }
   }, []);
 
-  const getProjectById = useCallback(async (id: string) => {
+  const fetchProjectById = useCallback(async (id: string) => {
     try {
       setError(null);
       const { data, error } = await supabaseClient
@@ -65,57 +63,6 @@ export function useProjects(): UseProjectsReturn {
       return null;
     }
   }, []);
-
-  const createProject = useCallback(
-    async (project: CreateProject): Promise<string | null> => {
-      try {
-        setError(null);
-        const { data, error } = await supabaseClient
-          .from("projects")
-          .insert(project)
-          .select()
-          .single();
-
-        if (error) throw error;
-        if (!data) throw new Error("Failed to create project");
-
-        setProjects((prev) => (prev ? [data, ...prev] : [data]));
-        return data.id;
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to create project"
-        );
-        return null;
-      }
-    },
-    []
-  );
-
-  const updateProject = useCallback(
-    async (project: Partial<Project> & { id: string }) => {
-      try {
-        setError(null);
-        const { error } = await supabaseClient
-          .from("projects")
-          .update(project)
-          .eq("id", project.id);
-
-        if (error) throw error;
-
-        setProjects((prev) =>
-          prev
-            ? prev.map((p) => (p.id === project.id ? { ...p, ...project } : p))
-            : prev
-        );
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to update project"
-        );
-        throw err;
-      }
-    },
-    []
-  );
 
   const createProjectWithDetails = useCallback(
     async (userId: string, payload: SaveNewProjectPayload): Promise<string> => {
@@ -197,10 +144,8 @@ export function useProjects(): UseProjectsReturn {
     projects,
     error,
     loading,
-    getProjects,
-    getProjectById,
-    createProject,
-    updateProject,
+    fetchProjects,
+    fetchProjectById,
     createProjectWithDetails,
     updateProjectWithDetails,
     deleteProject,

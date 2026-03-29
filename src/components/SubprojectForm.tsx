@@ -1,6 +1,5 @@
 import { Form, Button } from "react-bootstrap";
-import { SubprojectFormData, ProjectMaterial } from "../types";
-import { InventoryItem } from "../types";
+import { SubprojectFormData, ProjectMaterial, InventoryItem } from "../types";
 import MaterialsSection from "./MaterialsSection";
 
 interface SubprojectFormProps {

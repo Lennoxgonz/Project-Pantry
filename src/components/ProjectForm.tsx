@@ -6,13 +6,13 @@ import { ProjectMaterial } from "../types";
 function ProjectForm({
   projectName,
   projectDescription,
-  projectTime,
+  estimatedHours,
   isPublic,
   materials,
   inventoryItems,
   onNameChange,
   onDescriptionChange,
-  onTimeChange,
+  onEstimatedHoursChange,
   onPublicChange,
   onMaterialsChange,
 }: ProjectFormProps) {
@@ -76,8 +76,8 @@ function ProjectForm({
         <Form.Label>Estimated Time (hours)</Form.Label>
         <Form.Control
           type="number"
-          value={projectTime}
-          onChange={(e) => onTimeChange(Number(e.target.value))}
+          value={estimatedHours}
+          onChange={(e) => onEstimatedHoursChange(Number(e.target.value))}
           min="0"
           step="0.5"
         />

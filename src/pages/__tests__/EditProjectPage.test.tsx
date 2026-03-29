@@ -3,9 +3,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EditProjectPage from "../EditProjectPage";
 
-const { mockGetProjectById, mockUpdateProjectWithDetails, mockSupabaseClient } =
+const {
+  mockFetchProjectById,
+  mockUpdateProjectWithDetails,
+  mockSupabaseClient,
+} =
   vi.hoisted(() => ({
-    mockGetProjectById: vi.fn(),
+    mockFetchProjectById: vi.fn(),
     mockUpdateProjectWithDetails: vi.fn(),
     mockSupabaseClient: {
       auth: {
@@ -17,7 +21,7 @@ const { mockGetProjectById, mockUpdateProjectWithDetails, mockSupabaseClient } =
 
 vi.mock("../../hooks/useProjects", () => ({
   useProjects: () => ({
-    getProjectById: mockGetProjectById,
+    fetchProjectById: mockFetchProjectById,
     updateProjectWithDetails: mockUpdateProjectWithDetails,
     error: null,
   }),
@@ -98,7 +102,7 @@ describe("EditProjectPage transactional save flow", () => {
     vi.clearAllMocks();
     mockEditPageReads();
 
-    mockGetProjectById.mockResolvedValue({
+    mockFetchProjectById.mockResolvedValue({
       id: "project-1",
       user_id: "user-1",
       name: "Old Project Name",

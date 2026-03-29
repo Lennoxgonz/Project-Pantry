@@ -9,14 +9,6 @@ export interface ProjectMaterial {
   updated_at: string;
 }
 
-export function isProjectMaterial(material: ProjectMaterial): boolean {
-  return material.project_id !== null && material.subproject_id === null;
-}
-
-export function isSubprojectMaterial(material: ProjectMaterial): boolean {
-  return material.project_id === null && material.subproject_id !== null;
-}
-
 export type CreateProjectMaterial = Omit<
   ProjectMaterial,
   "id" | "created_at" | "updated_at"

@@ -8,7 +8,7 @@ import SubprojectForm from "../components/SubprojectForm";
 import { useProjects } from "../hooks/useProjects";
 import supabaseClient from "../utils/supabaseClient";
 
-function sanitizeMaterials(materials: ProjectMaterial[]) {
+function toUpdateMaterialInputs(materials: ProjectMaterial[]) {
   return materials
     .filter(
       (material) =>
@@ -27,23 +27,23 @@ function EditProjectPage() {
   const navigate = useNavigate();
 
   const {
-    getProjectById,
+    fetchProjectById,
     updateProjectWithDetails,
-    error: projectError,
+    error: projectHookError,
   } = useProjects();
 
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
-  const [projectTime, setProjectTime] = useState<number>(0);
+  const [estimatedHours, setEstimatedHours] = useState<number>(0);
   const [isPublic, setIsPublic] = useState(false);
-  
+
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentMaterials, setCurrentMaterials] = useState<ProjectMaterial[]>([]);
-  const [subprojectsForms, setSubprojectsForms] = useState<SubprojectFormData[]>([]);
+  const [projectMaterials, setProjectMaterials] = useState<ProjectMaterial[]>([]);
+  const [subprojects, setSubprojects] = useState<SubprojectFormData[]>([]);
 
   const loadInventoryItems = useCallback(async () => {
     try {
@@ -69,14 +69,14 @@ function EditProjectPage() {
         setLoading(true);
         setError(null);
 
-        const projectData = await getProjectById(id);
+        const projectData = await fetchProjectById(id);
         if (!projectData) throw new Error("Project not found");
-        
+
         if (!isMounted) return;
 
         setProjectName(projectData.name);
         setProjectDescription(projectData.description || "");
-        setProjectTime(projectData.estimated_time || 0);
+        setEstimatedHours(projectData.estimated_time || 0);
         setIsPublic(projectData.is_public);
 
         const { data: materialsData, error: materialsError } = await supabaseClient
@@ -88,14 +88,15 @@ function EditProjectPage() {
         if (materialsError) throw materialsError;
         if (!isMounted) return;
 
-        setCurrentMaterials(materialsData || []);
+        setProjectMaterials(materialsData || []);
 
-        const { data: loadedSubprojects, error: subprojectsError } = await supabaseClient
+        const { data: loadedSubprojects, error: subprojectsError } =
+          await supabaseClient
           .from("subprojects")
           .select("*")
           .eq("project_id", id)
           .order("order_index");
-          
+
         if (subprojectsError) throw subprojectsError;
 
         if (loadedSubprojects && loadedSubprojects.length > 0) {
@@ -121,9 +122,9 @@ function EditProjectPage() {
           );
 
           if (!isMounted) return;
-          setSubprojectsForms(subprojectsWithMaterials);
+          setSubprojects(subprojectsWithMaterials);
         } else {
-          setSubprojectsForms([]);
+          setSubprojects([]);
         }
 
         await loadInventoryItems();
@@ -143,17 +144,17 @@ function EditProjectPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, getProjectById, loadInventoryItems]);
+  }, [id, fetchProjectById, loadInventoryItems]);
 
   function addSubproject() {
-    setSubprojectsForms(prev => [
-      ...prev,
+    setSubprojects((previousSubprojects) => [
+      ...previousSubprojects,
       {
         project_id: id!,
         name: "",
         description: "",
         estimated_time: 0,
-        order_index: prev.length,
+        order_index: previousSubprojects.length,
         materials: [],
       },
     ]);
@@ -164,8 +165,8 @@ function EditProjectPage() {
     field: keyof Omit<SubprojectFormData, "materials">,
     value: string | number
   ) {
-    setSubprojectsForms(prev => {
-      const updated = [...prev];
+    setSubprojects((previousSubprojects) => {
+      const updated = [...previousSubprojects];
       updated[index] = {
         ...updated[index],
         [field]: value,
@@ -178,16 +179,16 @@ function EditProjectPage() {
     index: number,
     updatedSubproject: SubprojectFormData
   ) {
-    setSubprojectsForms(prev => {
-      const updated = [...prev];
+    setSubprojects((previousSubprojects) => {
+      const updated = [...previousSubprojects];
       updated[index] = updatedSubproject;
       return updated;
     });
   }
 
   function removeSubproject(index: number) {
-    setSubprojectsForms(prev => {
-      const filtered = prev.filter((_, i) => i !== index);
+    setSubprojects((previousSubprojects) => {
+      const filtered = previousSubprojects.filter((_, i) => i !== index);
       return filtered.map((subproject, i) => ({
         ...subproject,
         order_index: i,
@@ -220,16 +221,16 @@ function EditProjectPage() {
         id,
         name: projectName,
         description: projectDescription,
-        estimated_time: projectTime,
+        estimated_time: estimatedHours,
         is_public: isPublic,
-        materials: sanitizeMaterials(currentMaterials),
-        subprojects: subprojectsForms.map((subproject, index) => ({
+        materials: toUpdateMaterialInputs(projectMaterials),
+        subprojects: subprojects.map((subproject, index) => ({
           id: subproject.id,
           name: subproject.name,
-          description: subproject.description,
-          estimated_time: subproject.estimated_time,
+          description: subproject.description || "",
+          estimated_time: subproject.estimated_time || 0,
           order_index: index,
-          materials: sanitizeMaterials(subproject.materials),
+          materials: toUpdateMaterialInputs(subproject.materials),
         })),
       });
 
@@ -256,7 +257,7 @@ function EditProjectPage() {
     );
   }
 
-  const combinedError = error || projectError;
+  const combinedError = error || projectHookError;
 
   return (
     <Container className="py-4">
@@ -284,19 +285,19 @@ function EditProjectPage() {
         <ProjectForm
           projectName={projectName}
           projectDescription={projectDescription}
-          projectTime={projectTime}
+          estimatedHours={estimatedHours}
           isPublic={isPublic}
-          materials={currentMaterials}
+          materials={projectMaterials}
           inventoryItems={inventoryItems}
           onNameChange={setProjectName}
           onDescriptionChange={setProjectDescription}
-          onTimeChange={setProjectTime}
+          onEstimatedHoursChange={setEstimatedHours}
           onPublicChange={setIsPublic}
-          onMaterialsChange={setCurrentMaterials}
+          onMaterialsChange={setProjectMaterials}
         />
 
         <h2 className="mt-4">Subprojects</h2>
-        {subprojectsForms.map((subproject, index) => (
+        {subprojects.map((subproject, index) => (
           <SubprojectForm
             key={index}
             subproject={subproject}

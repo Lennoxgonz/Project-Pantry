@@ -1,14 +1,12 @@
 import { useState, useCallback } from "react";
-import { Subproject, CreateSubproject } from "../types";
+import { Subproject } from "../types";
 import supabaseClient from "../utils/supabaseClient";
 
 interface UseSubprojectsReturn {
   subprojects: Subproject[] | null;
   error: string | null;
   loading: boolean;
-  getSubprojects: (projectId: string) => Promise<void>;
-  createSubproject: (subproject: CreateSubproject) => Promise<string | null>;
-  deleteSubproject: (id: string) => Promise<void>;
+  fetchSubprojects: (projectId: string) => Promise<void>;
 }
 
 export function useSubprojects(): UseSubprojectsReturn {
@@ -16,7 +14,7 @@ export function useSubprojects(): UseSubprojectsReturn {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const getSubprojects = useCallback(async (projectId: string) => {
+  const fetchSubprojects = useCallback(async (projectId: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -37,53 +35,10 @@ export function useSubprojects(): UseSubprojectsReturn {
     }
   }, []);
 
-  const createSubproject = useCallback(async (subproject: CreateSubproject) => {
-    try {
-      setError(null);
-      const { data, error } = await supabaseClient
-        .from("subprojects")
-        .insert(subproject)
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error("Failed to create subproject");
-
-      setSubprojects((prev) => (prev ? [...prev, data] : [data]));
-      return data.id;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create subproject"
-      );
-      return null;
-    }
-  }, []);
-
-  const deleteSubproject = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      const { error } = await supabaseClient
-        .from("subprojects")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      setSubprojects((prev) =>
-        prev ? prev.filter((subproject) => subproject.id !== id) : null
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete subproject"
-      );
-    }
-  }, []);
-
   return {
     subprojects,
     error,
     loading,
-    getSubprojects,
-    createSubproject,
-    deleteSubproject,
+    fetchSubprojects,
   };
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import supabaseClient from "../utils/supabaseClient";
 
-function useAuth() {
+export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,5 +26,3 @@ function useAuth() {
 
   return { user, loading };
 }
-
-export default useAuth;

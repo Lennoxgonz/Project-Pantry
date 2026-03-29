@@ -1,189 +1,15 @@
 import { useState, useCallback } from "react";
-import { ProjectMaterial, CreateProjectMaterial } from "../types";
 import supabaseClient from "../utils/supabaseClient";
 
-type MaterialFieldValue = string | number | boolean | null;
-
-interface UseMaterialsOptions {
-  initialMaterials?: ProjectMaterial[];
-}
-
 interface UseMaterialsReturn {
-  materials: ProjectMaterial[];
   loading: boolean;
   error: string | null;
-
-  addMaterial: () => void;
-  updateMaterial: (
-    materialIndex: number,
-    field: keyof ProjectMaterial,
-    value: MaterialFieldValue
-  ) => void;
-  removeMaterial: (materialIndex: number) => void;
-
-  getMaterials: (projectId: string, subprojectId?: string) => Promise<void>;
-  createMaterial: (material: CreateProjectMaterial) => Promise<string | null>;
-  bulkCreateMaterials: (materials: CreateProjectMaterial[]) => Promise<void>;
-  deleteMaterial: (id: string) => Promise<void>;
   fulfillMaterials: (materialIds: string[]) => Promise<void>;
-  resetMaterials: (materials?: ProjectMaterial[]) => void;
 }
 
-export function useMaterials(
-  options: UseMaterialsOptions = {}
-): UseMaterialsReturn {
-  const [materials, setMaterials] = useState<ProjectMaterial[]>(
-    options.initialMaterials || []
-  );
+export function useMaterials(): UseMaterialsReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const addMaterial = useCallback(() => {
-    setMaterials((current) => [
-      ...current,
-      {
-        id: "",
-        project_id: null,
-        subproject_id: null,
-        inventory_item_id: "",
-        quantity_needed: 0,
-        is_fulfilled: false,
-        created_at: "",
-        updated_at: "",
-      },
-    ]);
-  }, []);
-
-  const updateMaterial = useCallback(
-    (
-      materialIndex: number,
-      field: keyof ProjectMaterial,
-      value: MaterialFieldValue
-    ) => {
-      setMaterials((current) =>
-        current.map((material, index) =>
-          index === materialIndex ? { ...material, [field]: value } : material
-        )
-      );
-    },
-    []
-  );
-
-  const removeMaterial = useCallback((materialIndex: number) => {
-    setMaterials((current) =>
-      current.filter((_, index) => index !== materialIndex)
-    );
-  }, []);
-
-  const resetMaterials = useCallback((newMaterials: ProjectMaterial[] = []) => {
-    setMaterials(newMaterials);
-  }, []);
-
-  const getMaterials = useCallback(
-    async (projectId: string, subprojectId?: string) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        let query = supabaseClient.from("project_materials").select(`
-          *,
-          inventory_items (
-            name,
-            quantity,
-            unit,
-            unit_cost
-          )
-        `);
-
-        if (subprojectId) {
-          query = query.eq("subproject_id", subprojectId);
-        } else {
-          query = query.eq("project_id", projectId);
-        }
-
-        const { data, error: queryError } = await query;
-
-        if (queryError) throw queryError;
-        setMaterials(data || []);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch materials"
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  const createMaterial = useCallback(
-    async (material: CreateProjectMaterial): Promise<string | null> => {
-      try {
-        setError(null);
-        const { data, error: createError } = await supabaseClient
-          .from("project_materials")
-          .insert(material)
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        if (!data) throw new Error("Failed to create material");
-
-        setMaterials((current) => [...current, data]);
-        return data.id;
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to create material"
-        );
-        return null;
-      }
-    },
-    []
-  );
-
-  const bulkCreateMaterials = useCallback(
-    async (newMaterials: CreateProjectMaterial[]) => {
-      if (newMaterials.length === 0) return;
-
-      try {
-        setError(null);
-        const { data, error: createError } = await supabaseClient
-          .from("project_materials")
-          .insert(newMaterials)
-          .select();
-
-        if (createError) throw createError;
-        if (!data) throw new Error("Failed to create materials");
-
-        setMaterials((current) => [...current, ...data]);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to create materials"
-        );
-      }
-    },
-    []
-  );
-
-  const deleteMaterial = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      const { error: deleteError } = await supabaseClient
-        .from("project_materials")
-        .delete()
-        .eq("id", id);
-
-      if (deleteError) throw deleteError;
-
-      setMaterials((current) =>
-        current.filter((material) => material.id !== id)
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete material"
-      );
-    }
-  }, []);
 
   const fulfillMaterials = useCallback(async (materialIds: string[]) => {
     try {
@@ -225,13 +51,6 @@ export function useMaterials(
         if (updateMaterialError) throw updateMaterialError;
       }
 
-      setMaterials((current) =>
-        current.map((material) =>
-          materialIds.includes(material.id)
-            ? { ...material, is_fulfilled: true }
-            : material
-        )
-      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to fulfill materials"
@@ -242,19 +61,8 @@ export function useMaterials(
   }, []);
 
   return {
-    materials,
     loading,
     error,
-
-    addMaterial,
-    updateMaterial,
-    removeMaterial,
-    resetMaterials,
-
-    getMaterials,
-    createMaterial,
-    bulkCreateMaterials,
-    deleteMaterial,
     fulfillMaterials,
   };
 }

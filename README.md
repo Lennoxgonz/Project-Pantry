@@ -6,6 +6,14 @@
 
 Project Pantry is a project-planning app for DIY work. You can break a project into subprojects, track materials, and keep everything organized in one place.
 
+## Key Features
+
+- Transactional project save and edit flows through Supabase RPC functions
+- Nested project planning with subprojects and per-scope material tracking
+- Inventory-aware material fulfillment with quantity checks
+- Auth-protected project and inventory management views
+- Project reporting with cost rollups based on material unit costs
+
 ## Why I Built It
 
 I wanted a cleaner way to plan home and personal projects without juggling notes, shopping lists, and task checklists across different apps. This project was also a way to practice building and testing a full React + Supabase workflow.
@@ -19,6 +27,13 @@ I wanted a cleaner way to plan home and personal projects without juggling notes
 - React Bootstrap
 - Supabase (Auth + Postgres)
 - Vitest + Testing Library
+
+## Architecture Decisions
+
+- **Single-call persistence for complex writes:** project create/edit uses RPC functions to keep project, subproject, and material writes atomic.
+- **Typed domain model in frontend:** TypeScript interfaces mirror database entities and payload contracts for safer refactors.
+- **Hook-driven data access:** page components orchestrate UI state while hooks encapsulate Supabase reads/writes.
+- **Fail-fast environment validation:** Supabase configuration is validated at startup to surface setup errors early.
 
 ## Getting Started
 
@@ -44,9 +59,6 @@ VITE_SUPABASE_URL=<your-supabase-url>
 VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
-## Database Diagram (Placeholder)
+## Database Diagram
 
-I will add an ERD/database diagram here
-
-<!-- TODO: Insert database diagram image -->
-<!-- Example: ![Database Diagram](./docs/database-diagram.png) -->
+The data model centers on `projects`, `subprojects`, `project_materials`, and `inventory_items`, with transactional RPC functions coordinating multi-table create/update operations.

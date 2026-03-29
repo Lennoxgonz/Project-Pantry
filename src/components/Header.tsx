@@ -1,7 +1,7 @@
 import { Container, Nav, Navbar } from "react-bootstrap";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import useAuth from "../hooks/useAuth";
+import { useAuth } from "../hooks/useAuth";
 import supabaseClient from "../utils/supabaseClient";
 
 function Header() {

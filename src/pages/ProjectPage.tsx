@@ -8,63 +8,35 @@ import {
   Button,
   Modal,
   Spinner,
-  Badge,
 } from "react-bootstrap";
 
-import { Project, ProjectMaterial, InventoryItem } from "../types";
+import { Project } from "../types";
 import { useProjects } from "../hooks/useProjects";
 import { useSubprojects } from "../hooks/useSubprojects";
 import { useMaterials } from "../hooks/useMaterials";
+import ProjectMaterialsList, {
+  MaterialWithInventory,
+} from "../components/ProjectMaterialsList";
 import supabaseClient from "../utils/supabaseClient";
 
-interface MaterialWithInventory extends ProjectMaterial {
-  inventory_item: InventoryItem;
-}
+function groupMaterialsBySubproject(
+  materials: MaterialWithInventory[]
+): Record<string, MaterialWithInventory[]> {
+  return materials.reduce(
+    (materialsBySubproject, material) => {
+      const subprojectId = material.subproject_id;
+      if (!subprojectId) {
+        return materialsBySubproject;
+      }
 
-function MaterialsList({ 
-  materials, 
-  onFulfill 
-}: { 
-  materials: MaterialWithInventory[];
-  onFulfill?: (materialIds: string[]) => void;
-}) {
-  if (!materials || materials.length === 0) {
-    return <div className="text-muted">No materials required</div>;
-  }
+      if (!materialsBySubproject[subprojectId]) {
+        materialsBySubproject[subprojectId] = [];
+      }
 
-  const unfulfilledMaterials = materials.filter(m => !m.is_fulfilled);
-  const allMaterialsFulfilled = unfulfilledMaterials.length === 0;
-
-  return (
-    <div>
-      <ListGroup variant="flush" className="mb-3">
-        {materials.map((material) => (
-          <ListGroup.Item
-            key={material.id}
-            className="d-flex justify-content-between align-items-center"
-          >
-            <div>
-              <div>{material.inventory_item.name}</div>
-              <small className="text-muted">
-                Needed: {material.quantity_needed} {material.inventory_item.unit}
-              </small>
-            </div>
-            <Badge bg={material.is_fulfilled ? "success" : "warning"}>
-              {material.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
-            </Badge>
-          </ListGroup.Item>
-        ))}
-      </ListGroup>
-      {onFulfill && !allMaterialsFulfilled && (
-        <Button 
-          variant="success" 
-          size="sm"
-          onClick={() => onFulfill(unfulfilledMaterials.map(m => m.id))}
-        >
-          Fulfill Materials
-        </Button>
-      )}
-    </div>
+      materialsBySubproject[subprojectId].push(material);
+      return materialsBySubproject;
+    },
+    {} as Record<string, MaterialWithInventory[]>
   );
 }
 
@@ -84,14 +56,14 @@ function ProjectPage() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   const {
-    getProjectById,
+    fetchProjectById,
     deleteProject,
     loading: projectLoading,
     error: projectError,
   } = useProjects();
   const {
     subprojects,
-    getSubprojects,
+    fetchSubprojects,
     loading: subprojectsLoading,
     error: subprojectsError,
   } = useSubprojects();
@@ -102,10 +74,10 @@ function ProjectPage() {
 
     try {
       setPageError(null);
-      const projectData = await getProjectById(id);
+      const projectData = await fetchProjectById(id);
       if (projectData) {
         setProject(projectData);
-        await getSubprojects(id);
+        await fetchSubprojects(id);
 
         const { data: projectMaterialsData, error: projectMaterialsError } =
           await supabaseClient
@@ -132,19 +104,7 @@ function ProjectPage() {
 
         if (subMaterialsError) throw subMaterialsError;
 
-        const materialsBySubproject = (subMaterialsData || []).reduce(
-          (acc, material) => {
-            const subprojectId = material.subproject_id;
-            if (!acc[subprojectId]) {
-              acc[subprojectId] = [];
-            }
-            acc[subprojectId].push(material);
-            return acc;
-          },
-          {} as Record<string, MaterialWithInventory[]>
-        );
-
-        setSubprojectMaterials(materialsBySubproject);
+        setSubprojectMaterials(groupMaterialsBySubproject(subMaterialsData || []));
       } else {
         setProject(null);
       }
@@ -153,20 +113,20 @@ function ProjectPage() {
         error instanceof Error ? error.message : "Failed to load project data."
       );
     }
-  }, [id, getProjectById, getSubprojects]);
+  }, [id, fetchProjectById, fetchSubprojects]);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
     const initializeData = async () => {
-      if (!mounted) return;
+      if (!isMounted) return;
       await loadData();
     };
 
     initializeData();
 
     return () => {
-      mounted = false;
+      isMounted = false;
     };
   }, [loadData]);
 
@@ -308,7 +268,7 @@ function ProjectPage() {
           <Card className="mb-4">
             <Card.Body>
               <Card.Title>Project Materials</Card.Title>
-              <MaterialsList 
+              <ProjectMaterialsList
                 materials={projectMaterials} 
                 onFulfill={handleFulfillMaterials}
               />
@@ -339,7 +299,7 @@ function ProjectPage() {
                       </ListGroup.Item>
                       <ListGroup.Item>
                         <strong>Materials:</strong>
-                        <MaterialsList 
+                        <ProjectMaterialsList
                           materials={subprojectMaterials[subproject.id] || []}
                           onFulfill={handleFulfillMaterials}
                         />

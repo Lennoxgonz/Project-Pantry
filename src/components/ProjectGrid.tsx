@@ -1,5 +1,5 @@
 import { Row, Col, Card, Alert, Button } from "react-bootstrap";
-import { Project } from "../types/";
+import { Project } from "../types";
 import { useNavigate } from "react-router-dom";
 
 interface ProjectGridProps {

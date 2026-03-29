@@ -7,7 +7,7 @@ import ProjectForm from "../components/ProjectForm";
 import SubprojectForm from "../components/SubprojectForm";
 import { useProjects } from "../hooks/useProjects";
 
-function sanitizeMaterials(materials: ProjectMaterial[]) {
+function toCreateMaterialInputs(materials: ProjectMaterial[]) {
   return materials
     .filter(
       (material) =>
@@ -21,10 +21,10 @@ function sanitizeMaterials(materials: ProjectMaterial[]) {
 }
 
 function NewProjectPage() {
-  const { createProjectWithDetails, error: projectSaveError } = useProjects();
+  const { createProjectWithDetails, error: projectHookError } = useProjects();
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
-  const [projectTime, setProjectTime] = useState<number>(0);
+  const [estimatedHours, setEstimatedHours] = useState<number>(0);
   const [isPublic, setIsPublic] = useState(false);
   const [projectMaterials, setProjectMaterials] = useState<ProjectMaterial[]>(
     []
@@ -119,22 +119,22 @@ function NewProjectPage() {
       await createProjectWithDetails(session.user.id, {
         name: projectName,
         description: projectDescription,
-        estimated_time: projectTime,
+        estimated_time: estimatedHours,
         is_public: isPublic,
-        materials: sanitizeMaterials(projectMaterials),
+        materials: toCreateMaterialInputs(projectMaterials),
         subprojects: subprojects.map((sub, index) => ({
           name: sub.name,
-          description: sub.description,
-          estimated_time: sub.estimated_time,
+          description: sub.description || "",
+          estimated_time: sub.estimated_time || 0,
           order_index: index,
-          materials: sanitizeMaterials(sub.materials),
+          materials: toCreateMaterialInputs(sub.materials),
         })),
       });
 
       setSuccess(true);
       setProjectName("");
       setProjectDescription("");
-      setProjectTime(0);
+      setEstimatedHours(0);
       setIsPublic(false);
       setProjectMaterials([]);
       setSubprojects([]);
@@ -145,7 +145,7 @@ function NewProjectPage() {
     }
   }
 
-  const combinedError = error || projectSaveError;
+  const combinedError = error || projectHookError;
 
   return (
     <Container className="py-4">
@@ -159,13 +159,13 @@ function NewProjectPage() {
         <ProjectForm
           projectName={projectName}
           projectDescription={projectDescription}
-          projectTime={projectTime}
+          estimatedHours={estimatedHours}
           isPublic={isPublic}
           materials={projectMaterials}
           inventoryItems={inventoryItems}
           onNameChange={setProjectName}
           onDescriptionChange={setProjectDescription}
-          onTimeChange={setProjectTime}
+          onEstimatedHoursChange={setEstimatedHours}
           onPublicChange={setIsPublic}
           onMaterialsChange={setProjectMaterials}
         />

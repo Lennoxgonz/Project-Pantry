@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Container,
   Spinner,
@@ -16,13 +17,14 @@ import ProjectReport from "../components/ProjectReport";
 import { useProjects } from "../hooks/useProjects";
 
 function ProjectsPage(): JSX.Element {
-  const { projects, error, loading, getProjects } = useProjects();
+  const navigate = useNavigate();
+  const { projects, error, loading, fetchProjects } = useProjects();
   const [searchTerm, setSearchTerm] = useState("");
   const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
-    void getProjects();
-  }, [getProjects]);
+    void fetchProjects();
+  }, [fetchProjects]);
 
   if (loading) {
     return (
@@ -72,7 +74,7 @@ function ProjectsPage(): JSX.Element {
           )}
           <Button
             variant="success"
-            href="/projects/new"
+            onClick={() => navigate("/projects/new")}
             className="d-flex align-items-center gap-2"
           >
             <Plus size={20} />

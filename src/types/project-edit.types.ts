@@ -1,12 +1,6 @@
-import { Subproject, ProjectMaterial, InventoryItem } from "./index";
-
-export interface ProjectFormData {
-  name: string;
-  description: string;
-  estimated_time: number;
-  is_public: boolean;
-  materials: ProjectMaterial[];
-}
+import { InventoryItem } from "./inventory-item.types";
+import { ProjectMaterial } from "./project-material.types";
+import { Subproject } from "./subproject.types";
 
 export interface SaveMaterialInput {
   id?: string;
@@ -52,13 +46,13 @@ export interface SubprojectFormData
 export interface ProjectFormProps {
   projectName: string;
   projectDescription: string;
-  projectTime: number;
+  estimatedHours: number;
   isPublic: boolean;
   materials: ProjectMaterial[];
   inventoryItems: InventoryItem[];
   onNameChange: (name: string) => void;
   onDescriptionChange: (description: string) => void;
-  onTimeChange: (time: number) => void;
+  onEstimatedHoursChange: (hours: number) => void;
   onPublicChange: (isPublic: boolean) => void;
   onMaterialsChange: (materials: ProjectMaterial[]) => void;
 }
