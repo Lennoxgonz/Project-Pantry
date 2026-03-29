@@ -1,9 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-/**
- * Validate required env vars at app startup so misconfiguration fails fast
- * with a clear and actionable error message.
- */
 const getRequiredEnvVar = (name: string): string => {
   const value = import.meta.env[name];
 

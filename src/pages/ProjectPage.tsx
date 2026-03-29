@@ -74,9 +74,14 @@ function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [projectMaterials, setProjectMaterials] = useState<MaterialWithInventory[]>([]);
-  const [subprojectMaterials, setSubprojectMaterials] = useState<Record<string, MaterialWithInventory[]>>({});
+  const [projectMaterials, setProjectMaterials] = useState<
+    MaterialWithInventory[]
+  >([]);
+  const [subprojectMaterials, setSubprojectMaterials] = useState<
+    Record<string, MaterialWithInventory[]>
+  >({});
   const [fulfillError, setFulfillError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   const {
     getProjectById,
@@ -96,12 +101,12 @@ function ProjectPage() {
     if (!id) return;
 
     try {
+      setPageError(null);
       const projectData = await getProjectById(id);
       if (projectData) {
         setProject(projectData);
         await getSubprojects(id);
 
-        // Get project materials
         const { data: projectMaterialsData, error: projectMaterialsError } =
           await supabaseClient
             .from("project_materials")
@@ -115,7 +120,6 @@ function ProjectPage() {
         if (projectMaterialsError) throw projectMaterialsError;
         setProjectMaterials(projectMaterialsData || []);
 
-        // Get subproject materials
         const { data: subMaterialsData, error: subMaterialsError } =
           await supabaseClient
             .from("project_materials")
@@ -128,7 +132,6 @@ function ProjectPage() {
 
         if (subMaterialsError) throw subMaterialsError;
 
-        // Group materials by subproject
         const materialsBySubproject = (subMaterialsData || []).reduce(
           (acc, material) => {
             const subprojectId = material.subproject_id;
@@ -146,7 +149,9 @@ function ProjectPage() {
         setProject(null);
       }
     } catch (error) {
-      console.error("Error loading project data:", error);
+      setPageError(
+        error instanceof Error ? error.message : "Failed to load project data."
+      );
     }
   }, [id, getProjectById, getSubprojects]);
 
@@ -169,10 +174,13 @@ function ProjectPage() {
     if (!id) return;
     try {
       setIsDeleting(true);
+      setPageError(null);
       await deleteProject(id);
       navigate("/projects");
     } catch (err) {
-      console.error("Error deleting project:", err);
+      setPageError(
+        err instanceof Error ? err.message : "Failed to delete project."
+      );
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
@@ -183,14 +191,16 @@ function ProjectPage() {
     setFulfillError(null);
     try {
       await fulfillMaterials(materialIds);
-      await loadData(); // Reload data to show updated fulfillment status
+      await loadData();
     } catch (err) {
-      setFulfillError(err instanceof Error ? err.message : "Failed to fulfill materials");
+      setFulfillError(
+        err instanceof Error ? err.message : "Failed to fulfill materials"
+      );
     }
   }
 
   const loading = projectLoading || subprojectsLoading;
-  const error = projectError || subprojectsError || fulfillError;
+  const error = projectError || subprojectsError || fulfillError || pageError;
 
   if (loading) {
     return (

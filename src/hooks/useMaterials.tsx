@@ -106,7 +106,6 @@ export function useMaterials(
         if (queryError) throw queryError;
         setMaterials(data || []);
       } catch (err) {
-        console.error("Error fetching materials:", err);
         setError(
           err instanceof Error ? err.message : "Failed to fetch materials"
         );
@@ -133,7 +132,6 @@ export function useMaterials(
         setMaterials((current) => [...current, data]);
         return data.id;
       } catch (err) {
-        console.error("Error creating material:", err);
         setError(
           err instanceof Error ? err.message : "Failed to create material"
         );
@@ -159,7 +157,6 @@ export function useMaterials(
 
         setMaterials((current) => [...current, ...data]);
       } catch (err) {
-        console.error("Error creating materials:", err);
         setError(
           err instanceof Error ? err.message : "Failed to create materials"
         );
@@ -182,7 +179,6 @@ export function useMaterials(
         current.filter((material) => material.id !== id)
       );
     } catch (err) {
-      console.error("Error deleting material:", err);
       setError(
         err instanceof Error ? err.message : "Failed to delete material"
       );
@@ -237,7 +233,6 @@ export function useMaterials(
         )
       );
     } catch (err) {
-      console.error("Error fulfilling materials:", err);
       setError(
         err instanceof Error ? err.message : "Failed to fulfill materials"
       );

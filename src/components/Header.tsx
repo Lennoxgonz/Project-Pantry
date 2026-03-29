@@ -1,4 +1,5 @@
 import { Container, Nav, Navbar } from "react-bootstrap";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import supabaseClient from "../utils/supabaseClient";
@@ -6,14 +7,18 @@ import supabaseClient from "../utils/supabaseClient";
 function Header() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   async function handleSignOut() {
     try {
+      setSignOutError(null);
       const { error } = await supabaseClient.auth.signOut();
       if (error) throw error;
       navigate("/signin");
     } catch (error) {
-      console.error("Error signing out:", error);
+      setSignOutError(
+        error instanceof Error ? error.message : "Unable to sign out."
+      );
     }
   }
 
@@ -44,6 +49,11 @@ function Header() {
             {user ? (
               <>
                 <Nav.Link onClick={handleSignOut}>Sign Out</Nav.Link>
+                {signOutError && (
+                  <Navbar.Text className="text-warning ms-2">
+                    {signOutError}
+                  </Navbar.Text>
+                )}
               </>
             ) : (
               <Nav.Link as={Link} to="/signin">

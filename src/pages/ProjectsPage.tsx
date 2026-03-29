@@ -21,23 +21,7 @@ function ProjectsPage(): JSX.Element {
   const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    const loadProjects = async () => {
-      try {
-        await getProjects();
-      } catch (error) {
-        if (mounted) {
-          console.error("Error loading projects:", error);
-        }
-      }
-    };
-
-    loadProjects();
-
-    return () => {
-      mounted = false;
-    };
+    void getProjects();
   }, [getProjects]);
 
   if (loading) {

@@ -29,7 +29,6 @@ export function useSubprojects(): UseSubprojectsReturn {
       if (error) throw error;
       setSubprojects(data);
     } catch (err) {
-      console.error("Error fetching subprojects:", err);
       setError(
         err instanceof Error ? err.message : "Failed to fetch subprojects"
       );
@@ -53,7 +52,6 @@ export function useSubprojects(): UseSubprojectsReturn {
       setSubprojects((prev) => (prev ? [...prev, data] : [data]));
       return data.id;
     } catch (err) {
-      console.error("Error creating subproject:", err);
       setError(
         err instanceof Error ? err.message : "Failed to create subproject"
       );
@@ -74,7 +72,6 @@ export function useSubprojects(): UseSubprojectsReturn {
         prev ? prev.filter((subproject) => subproject.id !== id) : null
       );
     } catch (err) {
-      console.error("Error deleting subproject:", err);
       setError(
         err instanceof Error ? err.message : "Failed to delete subproject"
       );

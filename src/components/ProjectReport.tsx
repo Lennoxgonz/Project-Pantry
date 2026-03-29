@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Table, Spinner } from "react-bootstrap";
+import { Modal, Table, Spinner, Alert } from "react-bootstrap";
 import { Project, ProjectMaterial, Subproject } from "../types";
 import supabaseClient from "../utils/supabaseClient";
 
@@ -9,18 +9,25 @@ interface ProjectReportProps {
   projects: Project[];
 }
 
+interface ReportMaterial extends ProjectMaterial {
+  inventory_items: {
+    unit_cost: number | null;
+  } | null;
+}
+
 function ProjectReport({
   show,
   onHide,
   projects,
 }: ProjectReportProps): JSX.Element {
   const [loading, setLoading] = useState(true);
-  const [materials, setMaterials] = useState<Record<string, ProjectMaterial[]>>(
+  const [materials, setMaterials] = useState<Record<string, ReportMaterial[]>>(
     {}
   );
   const [subprojects, setSubprojects] = useState<Record<string, Subproject[]>>(
     {}
   );
+  const [reportError, setReportError] = useState<string | null>(null);
   const currentDate = new Date().toLocaleString();
 
   useEffect(() => {
@@ -28,18 +35,29 @@ function ProjectReport({
 
     async function fetchReportData() {
       if (!show || !projects.length) {
+        setMaterials({});
+        setSubprojects({});
+        setReportError(null);
         setLoading(false);
         return;
       }
 
       setLoading(true);
+      setReportError(null);
       try {
         const projectIds = projects.map((p) => p.id);
 
         const [materialsResponse, subprojectsResponse] = await Promise.all([
           supabaseClient
             .from("project_materials")
-            .select("*")
+            .select(
+              `
+              *,
+              inventory_items (
+                unit_cost
+              )
+            `
+            )
             .in("project_id", projectIds),
           supabaseClient
             .from("subprojects")
@@ -74,7 +92,11 @@ function ProjectReport({
         setMaterials(materialsByProject);
         setSubprojects(subprojectsByProject);
       } catch (error) {
-        console.error("Error fetching report data:", error);
+        setReportError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load report data."
+        );
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -92,7 +114,9 @@ function ProjectReport({
   function calculateProjectCost(projectId: string): number {
     const projectMaterials = materials[projectId] || [];
     return projectMaterials.reduce(
-      (sum, material) => sum + (material.quantity_needed || 0),
+      (sum, material) =>
+        sum +
+        (material.quantity_needed || 0) * (material.inventory_items?.unit_cost || 0),
       0
     );
   }
@@ -108,6 +132,10 @@ function ProjectReport({
             <Spinner animation="border" />
             <p className="mt-2">Loading report data...</p>
           </div>
+        ) : reportError ? (
+          <Alert variant="danger" className="mb-0">
+            {reportError}
+          </Alert>
         ) : (
           <>
             <div className="text-center mb-4">
