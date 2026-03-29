@@ -48,7 +48,7 @@ function SubprojectForm({
   function handleUpdateMaterial(
     materialIndex: number,
     field: keyof ProjectMaterial,
-    value: any
+    value: string | number | boolean | null
   ) {
     const newMaterials = subproject.materials.map((material, index) =>
       index === materialIndex ? { ...material, [field]: value } : material

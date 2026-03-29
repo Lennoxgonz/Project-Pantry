@@ -1,17 +1,27 @@
 import { useState, useEffect } from "react";
 import { Container, Form, Button, Alert } from "react-bootstrap";
-import {
-  CreateProject,
-  CreateSubproject,
-  InventoryItem,
-  ProjectMaterial,
-} from "../types";
+import { InventoryItem, ProjectMaterial } from "../types";
 import { SubprojectFormData } from "../types/project-edit.types";
 import supabaseClient from "../utils/supabaseClient";
 import ProjectForm from "../components/ProjectForm";
 import SubprojectForm from "../components/SubprojectForm";
+import { useProjects } from "../hooks/useProjects";
+
+function sanitizeMaterials(materials: ProjectMaterial[]) {
+  return materials
+    .filter(
+      (material) =>
+        material.inventory_item_id.trim() !== "" && material.quantity_needed > 0
+    )
+    .map((material) => ({
+      inventory_item_id: material.inventory_item_id,
+      quantity_needed: material.quantity_needed,
+      is_fulfilled: material.is_fulfilled,
+    }));
+}
 
 function NewProjectPage() {
+  const { createProjectWithDetails, error: projectSaveError } = useProjects();
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
   const [projectTime, setProjectTime] = useState<number>(0);
@@ -23,6 +33,7 @@ function NewProjectPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(function loadInventory() {
     async function fetchInventory() {
@@ -91,6 +102,7 @@ function NewProjectPage() {
     event.preventDefault();
     setError(null);
     setSuccess(false);
+    setIsSaving(true);
 
     try {
       const {
@@ -100,76 +112,24 @@ function NewProjectPage() {
       if (sessionError || !session?.user)
         throw new Error("Authentication required");
 
-      const projectData: CreateProject = {
-        user_id: session.user.id,
+      if (projectName.trim().length === 0) {
+        throw new Error("Project name is required");
+      }
+
+      await createProjectWithDetails(session.user.id, {
         name: projectName,
-        description: projectDescription || null,
-        estimated_time: projectTime || null,
+        description: projectDescription,
+        estimated_time: projectTime,
         is_public: isPublic,
-      };
-
-      const { data: project, error: projectError } = await supabaseClient
-        .from("projects")
-        .insert(projectData)
-        .select()
-        .single();
-
-      if (projectError) throw projectError;
-      if (!project) throw new Error("Failed to create project");
-
-      if (projectMaterials.length > 0) {
-        const projectMaterialsData = projectMaterials.map((material) => ({
-          project_id: project.id,
-          subproject_id: null,
-          inventory_item_id: material.inventory_item_id,
-          quantity_needed: material.quantity_needed,
-          is_fulfilled: false,
-        }));
-
-        const { error: projectMaterialsError } = await supabaseClient
-          .from("project_materials")
-          .insert(projectMaterialsData);
-
-        if (projectMaterialsError) throw projectMaterialsError;
-      }
-
-      if (subprojects.length > 0) {
-        const subprojectData: CreateSubproject[] = subprojects.map((sub) => ({
-          project_id: project.id,
+        materials: sanitizeMaterials(projectMaterials),
+        subprojects: subprojects.map((sub, index) => ({
           name: sub.name,
-          description: sub.description || null,
-          estimated_time: sub.estimated_time || null,
-          order_index: sub.order_index,
-        }));
-
-        const { data: insertedSubprojects, error: subprojectError } =
-          await supabaseClient
-            .from("subprojects")
-            .insert(subprojectData)
-            .select();
-
-        if (subprojectError) throw subprojectError;
-
-        for (let i = 0; i < insertedSubprojects.length; i++) {
-          const subprojectMaterials = subprojects[i].materials.map(
-            (material) => ({
-              subproject_id: insertedSubprojects[i].id,
-              project_id: null,
-              inventory_item_id: material.inventory_item_id,
-              quantity_needed: material.quantity_needed,
-              is_fulfilled: false,
-            })
-          );
-
-          if (subprojectMaterials.length > 0) {
-            const { error: materialError } = await supabaseClient
-              .from("project_materials")
-              .insert(subprojectMaterials);
-
-            if (materialError) throw materialError;
-          }
-        }
-      }
+          description: sub.description,
+          estimated_time: sub.estimated_time,
+          order_index: index,
+          materials: sanitizeMaterials(sub.materials),
+        })),
+      });
 
       setSuccess(true);
       setProjectName("");
@@ -180,13 +140,17 @@ function NewProjectPage() {
       setSubprojects([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsSaving(false);
     }
   }
+
+  const combinedError = error || projectSaveError;
 
   return (
     <Container className="py-4">
       <h1>Create New Project</h1>
-      {error && <Alert variant="danger">{error}</Alert>}
+      {combinedError && <Alert variant="danger">{combinedError}</Alert>}
       {success && (
         <Alert variant="success">Project created successfully!</Alert>
       )}
@@ -223,8 +187,8 @@ function NewProjectPage() {
           <Button variant="secondary" type="button" onClick={addSubproject}>
             Add Subproject
           </Button>
-          <Button variant="primary" type="submit">
-            Create Project
+          <Button variant="primary" type="submit" disabled={isSaving}>
+            {isSaving ? "Saving..." : "Create Project"}
           </Button>
         </div>
       </Form>

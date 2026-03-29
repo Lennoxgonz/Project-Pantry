@@ -9,7 +9,7 @@ interface MaterialsSectionProps {
   onUpdateMaterial: (
     materialIndex: number,
     field: keyof ProjectMaterial,
-    value: any
+    value: string | number | boolean | null
   ) => void;
   onRemoveMaterial: (materialIndex: number) => void;
 }

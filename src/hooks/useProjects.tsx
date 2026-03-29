@@ -1,5 +1,10 @@
 import { useState, useCallback } from "react";
 import { Project, CreateProject } from "../types";
+import {
+  SaveNewProjectPayload,
+  SaveProjectRpcResult,
+  UpdateProjectPayload,
+} from "../types/project-edit.types";
 import supabaseClient from "../utils/supabaseClient";
 
 interface UseProjectsReturn {
@@ -10,6 +15,14 @@ interface UseProjectsReturn {
   getProjectById: (id: string) => Promise<Project | null>;
   createProject: (project: CreateProject) => Promise<string | null>;
   updateProject: (project: Partial<Project> & { id: string }) => Promise<void>;
+  createProjectWithDetails: (
+    userId: string,
+    payload: SaveNewProjectPayload
+  ) => Promise<string>;
+  updateProjectWithDetails: (
+    userId: string,
+    payload: UpdateProjectPayload
+  ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 }
 
@@ -30,7 +43,6 @@ export function useProjects(): UseProjectsReturn {
       if (error) throw error;
       setProjects(data);
     } catch (err) {
-      console.error("Error fetching projects:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch projects");
     } finally {
       setLoading(false);
@@ -49,7 +61,6 @@ export function useProjects(): UseProjectsReturn {
       if (error) throw error;
       return data;
     } catch (err) {
-      console.error("Error fetching project:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch project");
       return null;
     }
@@ -71,7 +82,6 @@ export function useProjects(): UseProjectsReturn {
         setProjects((prev) => (prev ? [data, ...prev] : [data]));
         return data.id;
       } catch (err) {
-        console.error("Error creating project:", err);
         setError(
           err instanceof Error ? err.message : "Failed to create project"
         );
@@ -98,11 +108,69 @@ export function useProjects(): UseProjectsReturn {
             : prev
         );
       } catch (err) {
-        console.error("Error updating project:", err);
         setError(
           err instanceof Error ? err.message : "Failed to update project"
         );
         throw err;
+      }
+    },
+    []
+  );
+
+  const createProjectWithDetails = useCallback(
+    async (userId: string, payload: SaveNewProjectPayload): Promise<string> => {
+      try {
+        setError(null);
+        const { data, error } = await supabaseClient.rpc(
+          "save_new_project_with_materials_and_subprojects",
+          {
+            p_user_id: userId,
+            p_payload: payload,
+          }
+        );
+
+        if (error) throw error;
+
+        const result = data as SaveProjectRpcResult | null;
+        if (!result?.success || !result.project_id) {
+          throw new Error(result?.error || "Failed to save project");
+        }
+
+        return result.project_id;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to save project";
+        setError(message);
+        throw new Error(message);
+      }
+    },
+    []
+  );
+
+  const updateProjectWithDetails = useCallback(
+    async (userId: string, payload: UpdateProjectPayload): Promise<void> => {
+      try {
+        setError(null);
+        const { data, error } = await supabaseClient.rpc(
+          "update_project_with_materials_and_subprojects",
+          {
+            p_project_id: payload.id,
+            p_user_id: userId,
+            p_payload: payload,
+          }
+        );
+
+        if (error) throw error;
+
+        const result = data as SaveProjectRpcResult | null;
+        if (!result?.success) {
+          throw new Error(result?.error || "Failed to update project");
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to update project";
+        setError(message);
+        throw new Error(message);
       }
     },
     []
@@ -121,7 +189,6 @@ export function useProjects(): UseProjectsReturn {
         prev ? prev.filter((project) => project.id !== id) : null
       );
     } catch (err) {
-      console.error("Error deleting project:", err);
       setError(err instanceof Error ? err.message : "Failed to delete project");
     }
   }, []);
@@ -134,6 +201,8 @@ export function useProjects(): UseProjectsReturn {
     getProjectById,
     createProject,
     updateProject,
+    createProjectWithDetails,
+    updateProjectWithDetails,
     deleteProject,
   };
 }

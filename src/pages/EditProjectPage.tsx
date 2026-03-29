@@ -6,27 +6,31 @@ import { SubprojectFormData } from "../types/project-edit.types";
 import ProjectForm from "../components/ProjectForm";
 import SubprojectForm from "../components/SubprojectForm";
 import { useProjects } from "../hooks/useProjects";
-import { useSubprojects } from "../hooks/useSubprojects";
-import { useMaterials } from "../hooks/useMaterials";
 import supabaseClient from "../utils/supabaseClient";
+
+function sanitizeMaterials(materials: ProjectMaterial[]) {
+  return materials
+    .filter(
+      (material) =>
+        material.inventory_item_id.trim() !== "" && material.quantity_needed > 0
+    )
+    .map((material) => ({
+      id: material.id || undefined,
+      inventory_item_id: material.inventory_item_id,
+      quantity_needed: material.quantity_needed,
+      is_fulfilled: material.is_fulfilled,
+    }));
+}
 
 function EditProjectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { getProjectById, updateProject, error: projectError } = useProjects();
-  const { 
-    subprojects, 
-    getSubprojects, 
-    createSubproject, 
-    deleteSubproject, 
-    error: subprojectsError 
-  } = useSubprojects();
-  
-  const { 
-    bulkCreateMaterials: createProjectMaterials,
-    error: projectMaterialsError 
-  } = useMaterials();
+  const {
+    getProjectById,
+    updateProjectWithDetails,
+    error: projectError,
+  } = useProjects();
 
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -37,6 +41,7 @@ function EditProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [currentMaterials, setCurrentMaterials] = useState<ProjectMaterial[]>([]);
   const [subprojectsForms, setSubprojectsForms] = useState<SubprojectFormData[]>([]);
 
@@ -50,7 +55,6 @@ function EditProjectPage() {
       if (error) throw error;
       setInventoryItems(data || []);
     } catch (err) {
-      console.error("Inventory loading error:", err);
       setError(err instanceof Error ? err.message : "Failed to load inventory items");
     }
   }, []);
@@ -62,7 +66,6 @@ function EditProjectPage() {
       if (!id) return;
 
       try {
-        console.log("Starting to load project data...");
         setLoading(true);
         setError(null);
 
@@ -70,7 +73,6 @@ function EditProjectPage() {
         if (!projectData) throw new Error("Project not found");
         
         if (!isMounted) return;
-        console.log("Project data loaded:", projectData);
 
         setProjectName(projectData.name);
         setProjectDescription(projectData.description || "");
@@ -85,13 +87,9 @@ function EditProjectPage() {
 
         if (materialsError) throw materialsError;
         if (!isMounted) return;
-        
-        console.log("Project materials loaded:", materialsData);
+
         setCurrentMaterials(materialsData || []);
 
-        await getSubprojects(id);
-        if (!isMounted) return;
-        
         const { data: loadedSubprojects, error: subprojectsError } = await supabaseClient
           .from("subprojects")
           .select("*")
@@ -99,7 +97,6 @@ function EditProjectPage() {
           .order("order_index");
           
         if (subprojectsError) throw subprojectsError;
-        console.log("Subprojects loaded:", loadedSubprojects);
 
         if (loadedSubprojects && loadedSubprojects.length > 0) {
           const subprojectsWithMaterials = await Promise.all(
@@ -112,6 +109,7 @@ function EditProjectPage() {
               if (subMaterialsError) throw subMaterialsError;
 
               return {
+                id: sub.id,
                 project_id: sub.project_id,
                 name: sub.name,
                 description: sub.description || "",
@@ -123,17 +121,16 @@ function EditProjectPage() {
           );
 
           if (!isMounted) return;
-          console.log("Subprojects with materials:", subprojectsWithMaterials);
           setSubprojectsForms(subprojectsWithMaterials);
+        } else {
+          setSubprojectsForms([]);
         }
 
         await loadInventoryItems();
         if (!isMounted) return;
-        
-        console.log("Loading complete");
+
         setLoading(false);
       } catch (err) {
-        console.error("Error in loadProjectData:", err);
         if (isMounted) {
           setError(err instanceof Error ? err.message : "An error occurred");
           setLoading(false);
@@ -146,7 +143,7 @@ function EditProjectPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, getProjectById, getSubprojects, loadInventoryItems]);
+  }, [id, getProjectById, loadInventoryItems]);
 
   function addSubproject() {
     setSubprojectsForms(prev => [
@@ -204,64 +201,37 @@ function EditProjectPage() {
     }
     setError(null);
     setSuccess(false);
+    setIsSaving(true);
 
     try {
       if (!id) throw new Error("Project ID is required");
+      if (projectName.trim().length === 0) {
+        throw new Error("Project name is required");
+      }
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabaseClient.auth.getSession();
+      if (sessionError || !session?.user) {
+        throw new Error("Authentication required");
+      }
 
-      const { error: deleteMaterialsError } = await supabaseClient
-        .from("project_materials")
-        .delete()
-        .eq("project_id", id);
-
-      if (deleteMaterialsError) throw deleteMaterialsError;
-
-      await updateProject({
+      await updateProjectWithDetails(session.user.id, {
         id,
         name: projectName,
         description: projectDescription,
         estimated_time: projectTime,
         is_public: isPublic,
+        materials: sanitizeMaterials(currentMaterials),
+        subprojects: subprojectsForms.map((subproject, index) => ({
+          id: subproject.id,
+          name: subproject.name,
+          description: subproject.description,
+          estimated_time: subproject.estimated_time,
+          order_index: index,
+          materials: sanitizeMaterials(subproject.materials),
+        })),
       });
-
-      if (currentMaterials.length > 0) {
-        await createProjectMaterials(
-          currentMaterials.map(material => ({
-            project_id: id,
-            subproject_id: null,
-            inventory_item_id: material.inventory_item_id,
-            quantity_needed: material.quantity_needed,
-            is_fulfilled: material.is_fulfilled,
-          }))
-        );
-      }
-
-      if (subprojects) {
-        for (const subproject of subprojects) {
-          await deleteSubproject(subproject.id);
-        }
-      }
-
-      for (const subprojectForm of subprojectsForms) {
-        const subprojectId = await createSubproject({
-          project_id: id,
-          name: subprojectForm.name,
-          description: subprojectForm.description,
-          estimated_time: subprojectForm.estimated_time,
-          order_index: subprojectForm.order_index,
-        });
-
-        if (subprojectId && subprojectForm.materials.length > 0) {
-          await createProjectMaterials(
-            subprojectForm.materials.map(material => ({
-              project_id: null,
-              subproject_id: subprojectId,
-              inventory_item_id: material.inventory_item_id,
-              quantity_needed: material.quantity_needed,
-              is_fulfilled: material.is_fulfilled,
-            }))
-          );
-        }
-      }
 
       setSuccess(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -271,6 +241,8 @@ function EditProjectPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -284,7 +256,7 @@ function EditProjectPage() {
     );
   }
 
-  const combinedError = error || projectError || subprojectsError || projectMaterialsError;
+  const combinedError = error || projectError;
 
   return (
     <Container className="py-4">
@@ -295,11 +267,12 @@ function EditProjectPage() {
             variant="outline-primary"
             onClick={() => navigate(`/projects/${id}`)}
             className="me-2"
+            disabled={isSaving}
           >
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit}>
-            Save Changes
+          <Button variant="primary" onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
@@ -339,8 +312,8 @@ function EditProjectPage() {
           <Button variant="secondary" type="button" onClick={addSubproject}>
             Add Subproject
           </Button>
-          <Button variant="primary" type="submit">
-            Save Changes
+          <Button variant="primary" type="submit" disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </Form>

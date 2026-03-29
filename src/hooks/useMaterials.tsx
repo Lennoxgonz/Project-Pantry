@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { ProjectMaterial, CreateProjectMaterial } from "../types";
 import supabaseClient from "../utils/supabaseClient";
 
+type MaterialFieldValue = string | number | boolean | null;
+
 interface UseMaterialsOptions {
   initialMaterials?: ProjectMaterial[];
 }
@@ -15,7 +17,7 @@ interface UseMaterialsReturn {
   updateMaterial: (
     materialIndex: number,
     field: keyof ProjectMaterial,
-    value: any
+    value: MaterialFieldValue
   ) => void;
   removeMaterial: (materialIndex: number) => void;
 
@@ -53,7 +55,11 @@ export function useMaterials(
   }, []);
 
   const updateMaterial = useCallback(
-    (materialIndex: number, field: keyof ProjectMaterial, value: any) => {
+    (
+      materialIndex: number,
+      field: keyof ProjectMaterial,
+      value: MaterialFieldValue
+    ) => {
       setMaterials((current) =>
         current.map((material, index) =>
           index === materialIndex ? { ...material, [field]: value } : material

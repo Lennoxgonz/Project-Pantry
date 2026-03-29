@@ -35,7 +35,7 @@ function ProjectForm({
   function handleUpdateMaterial(
     materialIndex: number,
     field: keyof ProjectMaterial,
-    value: any
+    value: string | number | boolean | null
   ) {
     const updatedMaterials = materials.map((material, index) =>
       index === materialIndex ? { ...material, [field]: value } : material
