@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Alert, Button, Col, Form, Row, Spinner } from "react-bootstrap";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   getAuthSession,
   signOutCurrentUser,
@@ -9,12 +9,12 @@ import {
 } from "../data-access/auth.data";
 
 function ResetPasswordPage(): JSX.Element {
+  const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,9 +59,7 @@ function ResetPasswordPage(): JSX.Element {
       setErrorMessage(null);
       await updateCurrentUserPassword(password);
       await signOutCurrentUser();
-      setIsSuccess(true);
-      setPassword("");
-      setConfirmPassword("");
+      navigate("/auth/signin?passwordReset=success", { replace: true });
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -108,13 +106,6 @@ function ResetPasswordPage(): JSX.Element {
           Enter your new password below to finish resetting your account.
         </p>
 
-        {isSuccess && (
-          <Alert variant="success">
-            Password updated successfully. You can now{" "}
-            <Link to="/auth/signin">sign in</Link> with your new password.
-          </Alert>
-        )}
-
         {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
 
         <Form onSubmit={handleSubmit}>
@@ -125,7 +116,7 @@ function ResetPasswordPage(): JSX.Element {
               autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              disabled={isSubmitting || isSuccess}
+              disabled={isSubmitting}
               required
             />
           </Form.Group>
@@ -137,7 +128,7 @@ function ResetPasswordPage(): JSX.Element {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              disabled={isSubmitting || isSuccess}
+              disabled={isSubmitting}
               required
             />
           </Form.Group>
@@ -146,7 +137,7 @@ function ResetPasswordPage(): JSX.Element {
             type="submit"
             variant="primary"
             className="w-100"
-            disabled={isSubmitting || isSuccess}
+            disabled={isSubmitting}
           >
             {isSubmitting ? "Updating password..." : "Update password"}
           </Button>
