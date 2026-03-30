@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
 import { Modal, Table, Spinner, Alert } from "react-bootstrap";
-import { Project, ProjectMaterial, Subproject } from "../types";
-import supabaseClient from "../utils/supabaseClient";
+import { Project, Subproject } from "../types";
+import {
+  fetchProjectReportData,
+  ReportMaterial,
+} from "../data-access/reports.data";
 
 interface ProjectReportProps {
   show: boolean;
   onHide: () => void;
   projects: Project[];
-}
-
-interface ReportMaterial extends ProjectMaterial {
-  inventory_items: {
-    unit_cost: number | null;
-  } | null;
 }
 
 function ProjectReport({
@@ -46,41 +43,24 @@ function ProjectReport({
       setReportError(null);
       try {
         const projectIds = projects.map((p) => p.id);
-
-        const [materialsResponse, subprojectsResponse] = await Promise.all([
-          supabaseClient
-            .from("project_materials")
-            .select(
-              `
-              *,
-              inventory_items (
-                unit_cost
-              )
-            `
-            )
-            .in("project_id", projectIds),
-          supabaseClient
-            .from("subprojects")
-            .select("*")
-            .in("project_id", projectIds),
-        ]);
+        const reportData = await fetchProjectReportData(projectIds);
 
         if (!isMounted) return;
 
-        if (materialsResponse.error) throw materialsResponse.error;
-        if (subprojectsResponse.error) throw subprojectsResponse.error;
-
-        const materialsByProject = materialsResponse.data.reduce(
+        const materialsByProject = reportData.materials.reduce(
           (acc, material) => {
             const projectId = material.project_id;
+            if (!projectId) {
+              return acc;
+            }
             if (!acc[projectId]) acc[projectId] = [];
             acc[projectId].push(material);
             return acc;
           },
-          {} as Record<string, ProjectMaterial[]>
+          {} as Record<string, ReportMaterial[]>
         );
 
-        const subprojectsByProject = subprojectsResponse.data.reduce(
+        const subprojectsByProject = reportData.subprojects.reduce(
           (acc, subproject) => {
             if (!acc[subproject.project_id]) acc[subproject.project_id] = [];
             acc[subproject.project_id].push(subproject);

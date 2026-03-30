@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import NewProjectPage from "../NewProjectPage";
 
 const { mockSupabaseClient } = vi.hoisted(() => ({
@@ -47,6 +47,17 @@ function mockInventoryFetch() {
 }
 
 describe("NewProjectPage transactional save flow", () => {
+  function renderWithRoutes() {
+    return render(
+      <MemoryRouter initialEntries={["/projects/new"]}>
+        <Routes>
+          <Route path="/projects/new" element={<NewProjectPage />} />
+          <Route path="/projects" element={<div>Projects Page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockInventoryFetch();
@@ -63,11 +74,7 @@ describe("NewProjectPage transactional save flow", () => {
       error: null,
     });
 
-    render(
-      <BrowserRouter>
-        <NewProjectPage />
-      </BrowserRouter>
-    );
+    renderWithRoutes();
 
     fireEvent.change(screen.getAllByRole("textbox")[0], {
       target: { value: "Garage Shelves" },
@@ -92,9 +99,7 @@ describe("NewProjectPage transactional save flow", () => {
         name: "Garage Shelves",
       },
     });
-    expect(
-      await screen.findByText(/project created successfully!/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/projects page/i)).toBeInTheDocument();
   });
 
   it("shows save failure and preserves form state for retry", async () => {
@@ -103,11 +108,7 @@ describe("NewProjectPage transactional save flow", () => {
       error: null,
     });
 
-    render(
-      <BrowserRouter>
-        <NewProjectPage />
-      </BrowserRouter>
-    );
+    renderWithRoutes();
 
     const projectNameInput = screen.getAllByRole("textbox")[0];
     fireEvent.change(projectNameInput, {

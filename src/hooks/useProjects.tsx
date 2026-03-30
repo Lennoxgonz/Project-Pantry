@@ -2,10 +2,15 @@ import { useState, useCallback } from "react";
 import { Project } from "../types";
 import {
   SaveNewProjectPayload,
-  SaveProjectRpcResult,
   UpdateProjectPayload,
 } from "../types/project-edit.types";
-import supabaseClient from "../utils/supabaseClient";
+import {
+  createProjectWithDetailsData,
+  deleteProjectData,
+  fetchProjectByIdData,
+  fetchProjectsData,
+  updateProjectWithDetailsData,
+} from "../data-access/projects.data";
 
 interface UseProjectsReturn {
   projects: Project[] | null;
@@ -33,12 +38,7 @@ export function useProjects(): UseProjectsReturn {
     try {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabaseClient
-        .from("projects")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const data = await fetchProjectsData();
       setProjects(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch projects");
@@ -50,13 +50,7 @@ export function useProjects(): UseProjectsReturn {
   const fetchProjectById = useCallback(async (id: string) => {
     try {
       setError(null);
-      const { data, error } = await supabaseClient
-        .from("projects")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
+      const data = await fetchProjectByIdData(id);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch project");
@@ -68,22 +62,7 @@ export function useProjects(): UseProjectsReturn {
     async (userId: string, payload: SaveNewProjectPayload): Promise<string> => {
       try {
         setError(null);
-        const { data, error } = await supabaseClient.rpc(
-          "save_new_project_with_materials_and_subprojects",
-          {
-            p_user_id: userId,
-            p_payload: payload,
-          }
-        );
-
-        if (error) throw error;
-
-        const result = data as SaveProjectRpcResult | null;
-        if (!result?.success || !result.project_id) {
-          throw new Error(result?.error || "Failed to save project");
-        }
-
-        return result.project_id;
+        return await createProjectWithDetailsData(userId, payload);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to save project";
@@ -98,21 +77,7 @@ export function useProjects(): UseProjectsReturn {
     async (userId: string, payload: UpdateProjectPayload): Promise<void> => {
       try {
         setError(null);
-        const { data, error } = await supabaseClient.rpc(
-          "update_project_with_materials_and_subprojects",
-          {
-            p_project_id: payload.id,
-            p_user_id: userId,
-            p_payload: payload,
-          }
-        );
-
-        if (error) throw error;
-
-        const result = data as SaveProjectRpcResult | null;
-        if (!result?.success) {
-          throw new Error(result?.error || "Failed to update project");
-        }
+        await updateProjectWithDetailsData(userId, payload);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to update project";
@@ -126,12 +91,7 @@ export function useProjects(): UseProjectsReturn {
   const deleteProject = useCallback(async (id: string) => {
     try {
       setError(null);
-      const { error } = await supabaseClient
-        .from("projects")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await deleteProjectData(id);
       setProjects((prev) =>
         prev ? prev.filter((project) => project.id !== id) : null
       );

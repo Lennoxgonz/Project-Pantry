@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
 import { Container, Table, Form, Button, Alert } from "react-bootstrap";
-import supabaseClient from "../utils/supabaseClient";
 import { InventoryItem } from "../types";
 import MaterialModal from "../components/MaterialModal";
+import {
+  createInventoryItem,
+  deleteInventoryItem,
+  fetchInventoryItems,
+  updateInventoryItem,
+  updateInventoryItemQuantity,
+} from "../data-access/inventory.data";
+import { getCurrentUser } from "../data-access/auth.data";
+import { DataAccessError } from "../data-access/data-access-error";
 
 function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -15,22 +23,10 @@ function InventoryPage() {
   useEffect(function loadUserAndInventory() {
     async function fetchData() {
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabaseClient.auth.getUser();
-        if (userError) throw userError;
-        if (!user) throw new Error("No user logged in");
-
+        const user = await getCurrentUser();
         setUserId(user.id);
-
-        const { data, error } = await supabaseClient
-          .from("inventory_items")
-          .select("*")
-          .order("name");
-
-        if (error) throw error;
-        setInventory(data || []);
+        const items = await fetchInventoryItems();
+        setInventory(items);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load inventory"
@@ -49,14 +45,8 @@ function InventoryPage() {
     setError(null);
 
     try {
-      const { data, error } = await supabaseClient
-        .from("inventory_items")
-        .insert([material])
-        .select();
-
-      if (error) throw error;
-
-      setInventory([...inventory, data[0]]);
+      const createdItem = await createInventoryItem(material);
+      setInventory([...inventory, createdItem]);
       setShowModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add item");
@@ -69,12 +59,7 @@ function InventoryPage() {
     if (!editingItem) return;
 
     try {
-      const { error } = await supabaseClient
-        .from("inventory_items")
-        .update(material)
-        .eq("id", editingItem.id);
-
-      if (error) throw error;
+      await updateInventoryItem(editingItem.id, material);
 
       setInventory(
         inventory.map((item) =>
@@ -90,12 +75,7 @@ function InventoryPage() {
 
   async function handleUpdateQuantity(id: string, newQuantity: number) {
     try {
-      const { error } = await supabaseClient
-        .from("inventory_items")
-        .update({ quantity: newQuantity })
-        .eq("id", id);
-
-      if (error) throw error;
+      await updateInventoryItemQuantity(id, newQuantity);
 
       setInventory(
         inventory.map((item) =>
@@ -111,21 +91,15 @@ function InventoryPage() {
 
   async function handleDeleteItem(id: string) {
     try {
-      const { error } = await supabaseClient
-        .from("inventory_items")
-        .delete()
-        .eq("id", id);
-  
-      if (error) {
-        if (error.code === "23503") { // foreign key constraint error code
+      await deleteInventoryItem(id);
+      setInventory(inventory.filter((item) => item.id !== id));
+    } catch (err) {
+      if (err instanceof DataAccessError) {
+        if (err.code === "23503") {
           setError("Cannot delete material that is being used in projects");
           return;
         }
-        throw error;
       }
-  
-      setInventory(inventory.filter((item) => item.id !== id));
-    } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete item");
     }
   }

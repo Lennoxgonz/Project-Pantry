@@ -2,7 +2,7 @@ import { Container, Nav, Navbar } from "react-bootstrap";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import supabaseClient from "../utils/supabaseClient";
+import { signOutCurrentUser } from "../data-access/auth.data";
 
 function Header() {
   const { user } = useAuth();
@@ -12,8 +12,7 @@ function Header() {
   async function handleSignOut() {
     try {
       setSignOutError(null);
-      const { error } = await supabaseClient.auth.signOut();
-      if (error) throw error;
+      await signOutCurrentUser();
       navigate("/signin");
     } catch (error) {
       setSignOutError(

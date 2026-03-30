@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Container, Form, Button, Alert } from "react-bootstrap";
 import { InventoryItem, ProjectMaterial } from "../types";
 import { SubprojectFormData } from "../types/project-edit.types";
-import supabaseClient from "../utils/supabaseClient";
 import ProjectForm from "../components/ProjectForm";
 import SubprojectForm from "../components/SubprojectForm";
 import { useProjects } from "../hooks/useProjects";
+import { fetchInventoryItems } from "../data-access/inventory.data";
+import { getAuthSession } from "../data-access/auth.data";
 
 function toCreateMaterialInputs(materials: ProjectMaterial[]) {
   return materials
@@ -21,6 +23,7 @@ function toCreateMaterialInputs(materials: ProjectMaterial[]) {
 }
 
 function NewProjectPage() {
+  const navigate = useNavigate();
   const { createProjectWithDetails, error: projectHookError } = useProjects();
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -32,19 +35,13 @@ function NewProjectPage() {
   const [subprojects, setSubprojects] = useState<SubprojectFormData[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(function loadInventory() {
     async function fetchInventory() {
       try {
-        const { data, error } = await supabaseClient
-          .from("inventory_items")
-          .select("*")
-          .order("name");
-
-        if (error) throw error;
-        setInventoryItems(data || []);
+        const items = await fetchInventoryItems();
+        setInventoryItems(items);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       }
@@ -101,15 +98,11 @@ function NewProjectPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    setSuccess(false);
     setIsSaving(true);
 
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabaseClient.auth.getSession();
-      if (sessionError || !session?.user)
+      const session = await getAuthSession();
+      if (!session?.user)
         throw new Error("Authentication required");
 
       if (projectName.trim().length === 0) {
@@ -131,13 +124,7 @@ function NewProjectPage() {
         })),
       });
 
-      setSuccess(true);
-      setProjectName("");
-      setProjectDescription("");
-      setEstimatedHours(0);
-      setIsPublic(false);
-      setProjectMaterials([]);
-      setSubprojects([]);
+      navigate("/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -151,9 +138,6 @@ function NewProjectPage() {
     <Container className="py-4">
       <h1>Create New Project</h1>
       {combinedError && <Alert variant="danger">{combinedError}</Alert>}
-      {success && (
-        <Alert variant="success">Project created successfully!</Alert>
-      )}
 
       <Form onSubmit={handleSubmit}>
         <ProjectForm

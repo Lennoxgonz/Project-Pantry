@@ -10,17 +10,21 @@ import {
   Spinner,
 } from "react-bootstrap";
 
-import { Project } from "../types";
+import { Project, Subproject } from "../types";
 import { useProjects } from "../hooks/useProjects";
-import { useSubprojects } from "../hooks/useSubprojects";
-import { useMaterials } from "../hooks/useMaterials";
+import { fetchSubprojectsByProjectId } from "../data-access/subprojects.data";
+import {
+  fetchProjectMaterialsWithInventory,
+  ProjectMaterialWithInventory,
+  fetchSubprojectMaterialsWithInventory,
+  fulfillMaterialsByIds,
+} from "../data-access/materials.data";
 import ProjectMaterialsList, {
   MaterialWithInventory,
 } from "../components/ProjectMaterialsList";
-import supabaseClient from "../utils/supabaseClient";
 
 function groupMaterialsBySubproject(
-  materials: MaterialWithInventory[]
+  materials: ProjectMaterialWithInventory[]
 ): Record<string, MaterialWithInventory[]> {
   return materials.reduce(
     (materialsBySubproject, material) => {
@@ -54,6 +58,8 @@ function ProjectPage() {
   >({});
   const [fulfillError, setFulfillError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [subprojects, setSubprojects] = useState<Subproject[] | null>(null);
+  const [subprojectsLoading, setSubprojectsLoading] = useState(false);
 
   const {
     fetchProjectById,
@@ -61,50 +67,28 @@ function ProjectPage() {
     loading: projectLoading,
     error: projectError,
   } = useProjects();
-  const {
-    subprojects,
-    fetchSubprojects,
-    loading: subprojectsLoading,
-    error: subprojectsError,
-  } = useSubprojects();
-  const { fulfillMaterials } = useMaterials();
 
   const loadData = useCallback(async () => {
     if (!id) return;
 
     try {
       setPageError(null);
+      setSubprojectsLoading(true);
       const projectData = await fetchProjectById(id);
       if (projectData) {
         setProject(projectData);
-        await fetchSubprojects(id);
+        const [loadedSubprojects, projectMaterialsData, subMaterialsData] =
+          await Promise.all([
+            fetchSubprojectsByProjectId(id),
+            fetchProjectMaterialsWithInventory(id),
+            fetchSubprojectMaterialsWithInventory(),
+          ]);
 
-        const { data: projectMaterialsData, error: projectMaterialsError } =
-          await supabaseClient
-            .from("project_materials")
-            .select(`
-              *,
-              inventory_item:inventory_items(*)
-            `)
-            .eq("project_id", id)
-            .is("subproject_id", null);
-
-        if (projectMaterialsError) throw projectMaterialsError;
-        setProjectMaterials(projectMaterialsData || []);
-
-        const { data: subMaterialsData, error: subMaterialsError } =
-          await supabaseClient
-            .from("project_materials")
-            .select(`
-              *,
-              inventory_item:inventory_items(*)
-            `)
-            .is("project_id", null)
-            .not("subproject_id", "is", null);
-
-        if (subMaterialsError) throw subMaterialsError;
-
-        setSubprojectMaterials(groupMaterialsBySubproject(subMaterialsData || []));
+        setSubprojects(loadedSubprojects);
+        setProjectMaterials(projectMaterialsData);
+        setSubprojectMaterials(
+          groupMaterialsBySubproject(subMaterialsData)
+        );
       } else {
         setProject(null);
       }
@@ -112,8 +96,10 @@ function ProjectPage() {
       setPageError(
         error instanceof Error ? error.message : "Failed to load project data."
       );
+    } finally {
+      setSubprojectsLoading(false);
     }
-  }, [id, fetchProjectById, fetchSubprojects]);
+  }, [id, fetchProjectById]);
 
   useEffect(() => {
     let isMounted = true;
@@ -150,7 +136,7 @@ function ProjectPage() {
   async function handleFulfillMaterials(materialIds: string[]) {
     setFulfillError(null);
     try {
-      await fulfillMaterials(materialIds);
+      await fulfillMaterialsByIds(materialIds);
       await loadData();
     } catch (err) {
       setFulfillError(
@@ -160,7 +146,7 @@ function ProjectPage() {
   }
 
   const loading = projectLoading || subprojectsLoading;
-  const error = projectError || subprojectsError || fulfillError || pageError;
+  const error = projectError || fulfillError || pageError;
 
   if (loading) {
     return (
@@ -269,7 +255,7 @@ function ProjectPage() {
             <Card.Body>
               <Card.Title>Project Materials</Card.Title>
               <ProjectMaterialsList
-                materials={projectMaterials} 
+                materials={projectMaterials}
                 onFulfill={handleFulfillMaterials}
               />
             </Card.Body>

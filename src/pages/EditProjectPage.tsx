@@ -6,7 +6,13 @@ import { SubprojectFormData } from "../types/project-edit.types";
 import ProjectForm from "../components/ProjectForm";
 import SubprojectForm from "../components/SubprojectForm";
 import { useProjects } from "../hooks/useProjects";
-import supabaseClient from "../utils/supabaseClient";
+import { fetchInventoryItems } from "../data-access/inventory.data";
+import { fetchSubprojectsByProjectId } from "../data-access/subprojects.data";
+import {
+  fetchProjectMaterialsForEdit,
+  fetchSubprojectMaterialsForEdit,
+} from "../data-access/materials.data";
+import { getAuthSession } from "../data-access/auth.data";
 
 function toUpdateMaterialInputs(materials: ProjectMaterial[]) {
   return materials
@@ -47,13 +53,8 @@ function EditProjectPage() {
 
   const loadInventoryItems = useCallback(async () => {
     try {
-      const { data, error } = await supabaseClient
-        .from("inventory_items")
-        .select("*")
-        .order("name");
-
-      if (error) throw error;
-      setInventoryItems(data || []);
+      const inventoryData = await fetchInventoryItems();
+      setInventoryItems(inventoryData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load inventory items");
     }
@@ -79,35 +80,17 @@ function EditProjectPage() {
         setEstimatedHours(projectData.estimated_time || 0);
         setIsPublic(projectData.is_public);
 
-        const { data: materialsData, error: materialsError } = await supabaseClient
-          .from("project_materials")
-          .select("*")
-          .eq("project_id", id)
-          .is("subproject_id", null);
-
-        if (materialsError) throw materialsError;
+        const materialsData = await fetchProjectMaterialsForEdit(id);
         if (!isMounted) return;
 
         setProjectMaterials(materialsData || []);
 
-        const { data: loadedSubprojects, error: subprojectsError } =
-          await supabaseClient
-          .from("subprojects")
-          .select("*")
-          .eq("project_id", id)
-          .order("order_index");
-
-        if (subprojectsError) throw subprojectsError;
+        const loadedSubprojects = await fetchSubprojectsByProjectId(id);
 
         if (loadedSubprojects && loadedSubprojects.length > 0) {
           const subprojectsWithMaterials = await Promise.all(
             loadedSubprojects.map(async (sub) => {
-              const { data: subMaterials, error: subMaterialsError } = await supabaseClient
-                .from("project_materials")
-                .select("*")
-                .eq("subproject_id", sub.id);
-
-              if (subMaterialsError) throw subMaterialsError;
+              const subMaterials = await fetchSubprojectMaterialsForEdit(sub.id);
 
               return {
                 id: sub.id,
@@ -209,11 +192,8 @@ function EditProjectPage() {
       if (projectName.trim().length === 0) {
         throw new Error("Project name is required");
       }
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabaseClient.auth.getSession();
-      if (sessionError || !session?.user) {
+      const session = await getAuthSession();
+      if (!session?.user) {
         throw new Error("Authentication required");
       }
 
