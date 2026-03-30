@@ -78,6 +78,49 @@ export async function signOutCurrentUser(): Promise<void> {
 }
 
 /**
+ * Sends a password reset email for the provided account.
+ */
+export async function requestPasswordReset(
+  email: string,
+  redirectTo: string
+): Promise<void> {
+  try {
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    throw toDataAccessError(
+      error,
+      "Unable to send password reset email. Please try again."
+    );
+  }
+}
+
+/**
+ * Updates the password for the currently authenticated user.
+ */
+export async function updateCurrentUserPassword(
+  password: string
+): Promise<void> {
+  try {
+    const { error } = await supabaseClient.auth.updateUser({ password });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    throw toDataAccessError(
+      error,
+      "Unable to update password. Please request another reset link."
+    );
+  }
+}
+
+/**
  * Exposes the initialized auth client for the Supabase Auth UI component.
  */
 export function getAuthUiClient() {

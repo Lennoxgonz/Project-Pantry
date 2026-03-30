@@ -5,6 +5,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ProjectPage from "./pages/ProjectPage";
 import NewProjectPage from "./pages/NewProjectPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -16,7 +17,8 @@ function App() {
     <BrowserRouter>
       <Header />
       <Routes>
-        <Route path="/signin" element={<LoginPage />} />
+        <Route path="/auth/signin" element={<LoginPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<HomePage />} />
 
         <Route

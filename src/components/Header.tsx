@@ -13,7 +13,7 @@ function Header() {
     try {
       setSignOutError(null);
       await signOutCurrentUser();
-      navigate("/signin");
+      navigate("/auth/signin");
     } catch (error) {
       setSignOutError(
         error instanceof Error ? error.message : "Unable to sign out."
@@ -55,7 +55,7 @@ function Header() {
                 )}
               </>
             ) : (
-              <Nav.Link as={Link} to="/signin">
+              <Nav.Link as={Link} to="/auth/signin">
                 Sign In
               </Nav.Link>
             )}

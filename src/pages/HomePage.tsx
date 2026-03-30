@@ -19,7 +19,7 @@ function HomePage() {
               <Button
                 variant="light"
                 size="lg"
-                onClick={() => navigate("/signin")}
+                onClick={() => navigate("/auth/signin")}
                 className="fw-semibold"
               >
                 Get Started
@@ -153,7 +153,7 @@ function HomePage() {
         <Button
           variant="primary"
           size="lg"
-          onClick={() => navigate("/signin")}
+          onClick={() => navigate("/auth/signin")}
           className="fw-semibold"
         >
           Get Started Now
