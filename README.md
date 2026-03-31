@@ -8,7 +8,6 @@ Project Pantry is a project-planning app for DIY work. You can break a project i
 
 ## Key Features
 
-- Transactional project save and edit flows through Supabase RPC functions
 - Nested project planning with subprojects and per-scope material tracking
 - Inventory-aware material fulfillment with quantity checks
 - Auth-protected project and inventory management views
@@ -26,14 +25,6 @@ I wanted a cleaner way to plan home and personal projects without juggling notes
 - React Router
 - React Bootstrap
 - Supabase (Auth + Postgres)
-- Vitest + Testing Library
-
-## Architecture Decisions
-
-- **Single-call persistence for complex writes:** project create/edit uses RPC functions to keep project, subproject, and material writes atomic.
-- **Typed domain model in frontend:** TypeScript interfaces mirror database entities and payload contracts for safer refactors.
-- **Hook-driven data access:** page components orchestrate UI state while hooks encapsulate Supabase reads/writes.
-- **Fail-fast environment validation:** Supabase configuration is validated at startup to surface setup errors early.
 
 ## Getting Started
 
@@ -56,7 +47,7 @@ Create a `.env` file in the project root:
 
 ```bash
 VITE_SUPABASE_URL=<your-supabase-url>
-VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+VITE_SUPABASE_ANON_KEY=<your-supabase-public-key>
 ```
 
 ## Database Diagram
@@ -128,9 +119,9 @@ erDiagram
   AUTH_USERS ||--o{ PROJECTS : owns
   AUTH_USERS ||--o{ INVENTORY_ITEMS : owns
   PROJECTS ||--o{ SUBPROJECTS : contains
-  PROJECTS ||--o{ PROJECT_FILES : has
-  SUBPROJECTS ||--o{ PROJECT_FILES : has
-  PROJECTS ||--o{ PROJECT_MATERIALS : needs
-  SUBPROJECTS ||--o{ PROJECT_MATERIALS : needs
+  PROJECTS ||--o{ PROJECT_FILES : contains
+  SUBPROJECTS ||--o{ PROJECT_FILES : contains
+  PROJECTS ||--o{ PROJECT_MATERIALS : contains
+  SUBPROJECTS ||--o{ PROJECT_MATERIALS : contains
   INVENTORY_ITEMS ||--o{ PROJECT_MATERIALS : fulfills
 ```
