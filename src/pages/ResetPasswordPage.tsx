@@ -3,6 +3,7 @@ import { Alert, Button, Col, Form, Row, Spinner } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import {
   getAuthSession,
+  requestPasswordReset,
   signOutCurrentUser,
   subscribeToAuthStateChange,
   updateCurrentUserPassword,
@@ -14,8 +15,21 @@ function ResetPasswordPage(): JSX.Element {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [updatePasswordErrorMessage, setUpdatePasswordErrorMessage] = useState<
+    string | null
+  >(null);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
+  const [sendResetEmailErrorMessage, setSendResetEmailErrorMessage] = useState<
+    string | null
+  >(null);
+  const [sendResetEmailSuccessMessage, setSendResetEmailSuccessMessage] =
+    useState<string | null>(null);
+  const resetPasswordRedirectUrl = `${window.location.origin}/auth/reset-password`;
+  const hasRecoveryAttemptInUrl =
+    window.location.hash.includes("type=recovery") ||
+    new URLSearchParams(window.location.search).get("type") === "recovery";
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthStateChange((session) => {
@@ -41,33 +55,60 @@ function ResetPasswordPage(): JSX.Element {
     };
   }, []);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleUpdatePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (password.length < 8) {
-      setErrorMessage("Password must be at least 8 characters long.");
+      setUpdatePasswordErrorMessage("Password must be at least 8 characters long.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.");
+      setUpdatePasswordErrorMessage("Passwords do not match.");
       return;
     }
 
     try {
-      setIsSubmitting(true);
-      setErrorMessage(null);
+      setIsUpdatingPassword(true);
+      setUpdatePasswordErrorMessage(null);
       await updateCurrentUserPassword(password);
       await signOutCurrentUser();
       navigate("/auth/signin?passwordReset=success", { replace: true });
     } catch (error) {
-      setErrorMessage(
+      setUpdatePasswordErrorMessage(
         error instanceof Error
           ? error.message
           : "Unable to reset password. Please try again."
       );
     } finally {
-      setIsSubmitting(false);
+      setIsUpdatingPassword(false);
+    }
+  }
+
+  async function handleSendResetEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!resetEmail.trim()) {
+      setSendResetEmailErrorMessage("Enter an email address.");
+      return;
+    }
+
+    try {
+      setIsSendingResetEmail(true);
+      setSendResetEmailErrorMessage(null);
+      setSendResetEmailSuccessMessage(null);
+      await requestPasswordReset(resetEmail.trim(), resetPasswordRedirectUrl);
+      setSendResetEmailSuccessMessage(
+        "If this account exists, a reset email has been sent."
+      );
+    } catch (error) {
+      setSendResetEmailErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to send reset email. Please try again."
+      );
+    } finally {
+      setIsSendingResetEmail(false);
     }
   }
 
@@ -86,12 +127,50 @@ function ResetPasswordPage(): JSX.Element {
     return (
       <Row className="justify-content-center">
         <Col xs={12} sm={8} md={6} lg={5}>
-          <Alert variant="warning" className="mb-3">
-            This password reset link is invalid or expired.
-          </Alert>
-          <p className="mb-0">
-            Request a new reset email from the{" "}
-            <Link to="/auth/signin">sign in page</Link>.
+          <h1 className="h3 mb-3 text-center">Reset your password</h1>
+          <p className="text-muted text-center mb-4">
+            Enter your account email and we will send you a reset link.
+          </p>
+
+          {hasRecoveryAttemptInUrl && (
+            <Alert variant="warning" className="mb-3">
+              This password reset link is invalid or expired. Request a new one
+              below.
+            </Alert>
+          )}
+
+          {sendResetEmailSuccessMessage && (
+            <Alert variant="success">{sendResetEmailSuccessMessage}</Alert>
+          )}
+          {sendResetEmailErrorMessage && (
+            <Alert variant="danger">{sendResetEmailErrorMessage}</Alert>
+          )}
+
+          <Form onSubmit={handleSendResetEmail}>
+            <Form.Group className="mb-3" controlId="passwordResetEmail">
+              <Form.Label>Email address</Form.Label>
+              <Form.Control
+                type="email"
+                autoComplete="email"
+                value={resetEmail}
+                onChange={(event) => setResetEmail(event.target.value)}
+                disabled={isSendingResetEmail}
+                required
+              />
+            </Form.Group>
+
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-100 mb-3"
+              disabled={isSendingResetEmail}
+            >
+              {isSendingResetEmail ? "Sending..." : "Send reset email"}
+            </Button>
+          </Form>
+
+          <p className="mb-0 text-center">
+            Return to <Link to="/auth/signin">sign in</Link>.
           </p>
         </Col>
       </Row>
@@ -106,9 +185,11 @@ function ResetPasswordPage(): JSX.Element {
           Enter your new password below to finish resetting your account.
         </p>
 
-        {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
+        {updatePasswordErrorMessage && (
+          <Alert variant="danger">{updatePasswordErrorMessage}</Alert>
+        )}
 
-        <Form onSubmit={handleSubmit}>
+        <Form onSubmit={handleUpdatePassword}>
           <Form.Group className="mb-3" controlId="newPassword">
             <Form.Label>New password</Form.Label>
             <Form.Control
@@ -116,7 +197,7 @@ function ResetPasswordPage(): JSX.Element {
               autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              disabled={isSubmitting}
+              disabled={isUpdatingPassword}
               required
             />
           </Form.Group>
@@ -128,7 +209,7 @@ function ResetPasswordPage(): JSX.Element {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              disabled={isSubmitting}
+              disabled={isUpdatingPassword}
               required
             />
           </Form.Group>
@@ -137,9 +218,9 @@ function ResetPasswordPage(): JSX.Element {
             type="submit"
             variant="primary"
             className="w-100"
-            disabled={isSubmitting}
+            disabled={isUpdatingPassword}
           >
-            {isSubmitting ? "Updating password..." : "Update password"}
+            {isUpdatingPassword ? "Updating password..." : "Update password"}
           </Button>
         </Form>
       </Col>
