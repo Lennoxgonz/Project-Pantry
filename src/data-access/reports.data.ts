@@ -24,7 +24,7 @@ export async function fetchProjectReportData(
   }
 
   try {
-    const [materialsResponse, subprojectsResponse] = await Promise.all([
+    const [projectMaterialsResponse, subprojectsResponse] = await Promise.all([
       supabaseClient
         .from("project_materials")
         .select(
@@ -39,15 +39,44 @@ export async function fetchProjectReportData(
       supabaseClient.from("subprojects").select("*").in("project_id", projectIds),
     ]);
 
-    if (materialsResponse.error) {
-      throw materialsResponse.error;
+    if (projectMaterialsResponse.error) {
+      throw projectMaterialsResponse.error;
     }
     if (subprojectsResponse.error) {
       throw subprojectsResponse.error;
     }
 
+    const subprojectIds = (subprojectsResponse.data || []).map(
+      (subproject) => subproject.id
+    );
+
+    let subprojectMaterials: ReportMaterial[] = [];
+
+    if (subprojectIds.length > 0) {
+      const { data, error } = await supabaseClient
+        .from("project_materials")
+        .select(
+          `
+            *,
+            inventory_items (
+              unit_cost
+            )
+          `
+        )
+        .in("subproject_id", subprojectIds);
+
+      if (error) {
+        throw error;
+      }
+
+      subprojectMaterials = (data || []) as ReportMaterial[];
+    }
+
     return {
-      materials: (materialsResponse.data || []) as ReportMaterial[],
+      materials: [
+        ...((projectMaterialsResponse.data || []) as ReportMaterial[]),
+        ...subprojectMaterials,
+      ],
       subprojects: subprojectsResponse.data || [],
     };
   } catch (error) {

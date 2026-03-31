@@ -43,21 +43,36 @@ type ReportMaterial = ProjectMaterial & {
 };
 
 function mockReportFetches({
-  materials,
+  projectMaterials,
+  subprojectMaterials = [],
   subprojects,
   materialError = null,
 }: {
-  materials: ReportMaterial[];
+  projectMaterials: ReportMaterial[];
+  subprojectMaterials?: ReportMaterial[];
   subprojects: Subproject[];
   materialError?: Error | null;
 }) {
+  let projectMaterialsCallCount = 0;
+
   mockSupabaseClient.from.mockImplementation((table: string) => {
     if (table === "project_materials") {
       return {
         select: vi.fn(() => ({
-          in: vi.fn().mockResolvedValue({
-            data: materials,
-            error: materialError,
+          in: vi.fn(() => {
+            projectMaterialsCallCount += 1;
+
+            if (projectMaterialsCallCount === 1) {
+              return Promise.resolve({
+                data: projectMaterials,
+                error: materialError,
+              });
+            }
+
+            return Promise.resolve({
+              data: subprojectMaterials,
+              error: materialError,
+            });
           }),
         })),
       };
@@ -85,7 +100,7 @@ describe("ProjectReport", () => {
 
   it("calculates total cost from quantity multiplied by unit cost", async () => {
     mockReportFetches({
-      materials: [
+      projectMaterials: [
         {
           id: "m-1",
           project_id: "project-1",
@@ -120,6 +135,7 @@ describe("ProjectReport", () => {
           inventory_items: { unit_cost: 4 },
         },
       ],
+      subprojectMaterials: [],
       subprojects: [],
     });
 
@@ -134,9 +150,49 @@ describe("ProjectReport", () => {
     });
   });
 
+  it("includes subproject materials in project cost totals", async () => {
+    mockReportFetches({
+      projectMaterials: [],
+      subprojectMaterials: [
+        {
+          id: "sm-1",
+          project_id: null,
+          subproject_id: "subproject-1",
+          inventory_item_id: "inv-4",
+          quantity_needed: 2,
+          is_fulfilled: false,
+          created_at: "2024-01-01",
+          updated_at: "2024-01-01",
+          inventory_items: { unit_cost: 7 },
+        },
+      ],
+      subprojects: [
+        {
+          id: "subproject-1",
+          project_id: "project-1",
+          name: "Framing",
+          description: null,
+          estimated_time: 1,
+          order_index: 0,
+          created_at: "2024-01-01",
+          updated_at: "2024-01-01",
+        },
+      ],
+    });
+
+    render(
+      <ProjectReport show onHide={vi.fn()} projects={projects} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("$14.00")).toHaveLength(2);
+    });
+  });
+
   it("shows a clear error message when report data fetch fails", async () => {
     mockReportFetches({
-      materials: [],
+      projectMaterials: [],
+      subprojectMaterials: [],
       subprojects: [],
       materialError: new Error("Report fetch failed"),
     });

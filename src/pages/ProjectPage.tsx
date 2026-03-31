@@ -18,6 +18,7 @@ import {
   ProjectMaterialWithInventory,
   fetchSubprojectMaterialsWithInventory,
   fulfillMaterialsByIds,
+  unfulfillMaterialsByIds,
 } from "../data-access/materials.data";
 import ProjectMaterialsList, {
   MaterialWithInventory,
@@ -68,6 +69,18 @@ function ProjectPage() {
     error: projectError,
   } = useProjects();
 
+  const loadMaterialSections = useCallback(async () => {
+    if (!id) return;
+
+    const [projectMaterialsData, subMaterialsData] = await Promise.all([
+      fetchProjectMaterialsWithInventory(id),
+      fetchSubprojectMaterialsWithInventory(),
+    ]);
+
+    setProjectMaterials(projectMaterialsData);
+    setSubprojectMaterials(groupMaterialsBySubproject(subMaterialsData));
+  }, [id]);
+
   const loadData = useCallback(async () => {
     if (!id) return;
 
@@ -77,18 +90,12 @@ function ProjectPage() {
       const projectData = await fetchProjectById(id);
       if (projectData) {
         setProject(projectData);
-        const [loadedSubprojects, projectMaterialsData, subMaterialsData] =
-          await Promise.all([
-            fetchSubprojectsByProjectId(id),
-            fetchProjectMaterialsWithInventory(id),
-            fetchSubprojectMaterialsWithInventory(),
-          ]);
+        const [loadedSubprojects] = await Promise.all([
+          fetchSubprojectsByProjectId(id),
+          loadMaterialSections(),
+        ]);
 
         setSubprojects(loadedSubprojects);
-        setProjectMaterials(projectMaterialsData);
-        setSubprojectMaterials(
-          groupMaterialsBySubproject(subMaterialsData)
-        );
       } else {
         setProject(null);
       }
@@ -99,7 +106,7 @@ function ProjectPage() {
     } finally {
       setSubprojectsLoading(false);
     }
-  }, [id, fetchProjectById]);
+  }, [id, fetchProjectById, loadMaterialSections]);
 
   useEffect(() => {
     let isMounted = true;
@@ -137,7 +144,7 @@ function ProjectPage() {
     setFulfillError(null);
     try {
       await fulfillMaterialsByIds(materialIds);
-      await loadData();
+      await loadMaterialSections();
     } catch (err) {
       setFulfillError(
         err instanceof Error ? err.message : "Failed to fulfill materials"
@@ -145,10 +152,23 @@ function ProjectPage() {
     }
   }
 
-  const loading = projectLoading || subprojectsLoading;
+  async function handleUnfulfillMaterials(materialIds: string[]) {
+    setFulfillError(null);
+    try {
+      await unfulfillMaterialsByIds(materialIds);
+      await loadMaterialSections();
+    } catch (err) {
+      setFulfillError(
+        err instanceof Error ? err.message : "Failed to unfulfill materials"
+      );
+    }
+  }
+
+  const isInitialLoading =
+    (projectLoading || subprojectsLoading) && !project && !pageError && !projectError;
   const error = projectError || fulfillError || pageError;
 
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <Container className="d-flex justify-content-center align-items-center min-vh-100">
         <Spinner animation="border" role="status">
@@ -257,6 +277,7 @@ function ProjectPage() {
               <ProjectMaterialsList
                 materials={projectMaterials}
                 onFulfill={handleFulfillMaterials}
+                onUnfulfill={handleUnfulfillMaterials}
               />
             </Card.Body>
           </Card>
@@ -288,6 +309,7 @@ function ProjectPage() {
                         <ProjectMaterialsList
                           materials={subprojectMaterials[subproject.id] || []}
                           onFulfill={handleFulfillMaterials}
+                          onUnfulfill={handleUnfulfillMaterials}
                         />
                       </ListGroup.Item>
                     </ListGroup>

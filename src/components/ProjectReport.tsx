@@ -47,9 +47,21 @@ function ProjectReport({
 
         if (!isMounted) return;
 
+        const subprojectProjectIdMap = reportData.subprojects.reduce(
+          (acc, subproject) => {
+            acc[subproject.id] = subproject.project_id;
+            return acc;
+          },
+          {} as Record<string, string>
+        );
+
         const materialsByProject = reportData.materials.reduce(
           (acc, material) => {
-            const projectId = material.project_id;
+            const projectId =
+              material.project_id ||
+              (material.subproject_id
+                ? subprojectProjectIdMap[material.subproject_id]
+                : null);
             if (!projectId) {
               return acc;
             }

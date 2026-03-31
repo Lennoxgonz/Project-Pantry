@@ -121,27 +121,43 @@ export async function fetchSubprojectMaterialsForEdit(
 }
 
 /**
- * Fulfills project materials by decrementing inventory and marking fulfilled.
+ * Updates material fulfillment state and synchronizes inventory quantities.
  */
-export async function fulfillMaterialsByIds(materialIds: string[]): Promise<void> {
+async function updateMaterialsFulfillmentState(
+  materialIds: string[],
+  nextFulfilledState: boolean
+): Promise<void> {
+  const shouldFulfill = nextFulfilledState;
+  const expectedCurrentFulfilledState = !nextFulfilledState;
+  const missingMaterialsMessage = shouldFulfill
+    ? "No materials found to fulfill"
+    : "No materials found to unfulfill";
+
+  const operationFailedMessage = shouldFulfill
+    ? "Failed to fulfill materials"
+    : "Failed to unfulfill materials";
+
   try {
-    const { data: materialsToFulfill, error: fetchError } = await supabaseClient
+    const { data: materialsToUpdate, error: fetchError } = await supabaseClient
       .from("project_materials")
       .select("*, inventory_items(*)")
       .in("id", materialIds)
-      .eq("is_fulfilled", false);
+      .eq("is_fulfilled", expectedCurrentFulfilledState);
 
     if (fetchError) {
       throw fetchError;
     }
 
-    if (!materialsToFulfill || materialsToFulfill.length === 0) {
-      throw new Error("No materials found to fulfill");
+    if (!materialsToUpdate || materialsToUpdate.length === 0) {
+      throw new Error(missingMaterialsMessage);
     }
 
-    for (const material of materialsToFulfill as MaterialWithInventoryJoin[]) {
+    for (const material of materialsToUpdate as MaterialWithInventoryJoin[]) {
       const inventoryItem = material.inventory_items;
-      const newQuantity = inventoryItem.quantity - material.quantity_needed;
+      const quantityChange = shouldFulfill
+        ? -material.quantity_needed
+        : material.quantity_needed;
+      const newQuantity = inventoryItem.quantity + quantityChange;
 
       if (newQuantity < 0) {
         throw new Error(`Insufficient quantity for ${inventoryItem.name}`);
@@ -158,7 +174,7 @@ export async function fulfillMaterialsByIds(materialIds: string[]): Promise<void
 
       const { error: updateMaterialError } = await supabaseClient
         .from("project_materials")
-        .update({ is_fulfilled: true })
+        .update({ is_fulfilled: nextFulfilledState })
         .eq("id", material.id);
 
       if (updateMaterialError) {
@@ -166,6 +182,22 @@ export async function fulfillMaterialsByIds(materialIds: string[]): Promise<void
       }
     }
   } catch (error) {
-    throw toDataAccessError(error, "Failed to fulfill materials");
+    throw toDataAccessError(error, operationFailedMessage);
   }
+}
+
+/**
+ * Fulfills project materials by decrementing inventory and marking fulfilled.
+ */
+export async function fulfillMaterialsByIds(materialIds: string[]): Promise<void> {
+  await updateMaterialsFulfillmentState(materialIds, true);
+}
+
+/**
+ * Unfulfills project materials by restoring inventory and marking unfulfilled.
+ */
+export async function unfulfillMaterialsByIds(
+  materialIds: string[]
+): Promise<void> {
+  await updateMaterialsFulfillmentState(materialIds, false);
 }
